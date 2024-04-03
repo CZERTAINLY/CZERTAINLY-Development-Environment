@@ -1,0 +1,299 @@
+name: czertainly
+
+secrets:
+  trusted_certificates.pem:
+    file: ./secrets/trusted_certificates.pem
+
+services:
+
+  opa:
+    container_name: opa
+    image: openpolicyagent/opa:0.53.0-rootless
+    restart: unless-stopped
+    ports:
+      - 8181:8181
+    # WARNING: OPA is NOT running with an authorization policy configured. This
+    # means that clients can read and write policies in OPA. If you are
+    # deploying OPA in an insecure environment, be sure to configure
+    # authentication and authorization on the daemon. See the Security page for
+    # details: https://www.openpolicyagent.org/docs/security.html.
+    command:
+      - "run"
+      - "--server"
+      - "--log-format=json-pretty"
+      - "--set=decision_logs.console=true"
+      - "--set=services.nginx.url=http://opa-bundles:8080"
+      - "--set=bundles.nginx.service=nginx"
+      - "--set=bundles.nginx.resource=bundles/bundle.tar.gz"
+    depends_on:
+      - opa-bundle-server
+    profiles:
+      - opa-standalone
+      - core-dev
+      - core
+      - all
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.12.0-management
+    restart: unless-stopped
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./data/rabbitmq/data:/var/lib/rabbitmq
+      - ./data/rabbitmq/logs:/var/log/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - rabbitmq-standalone
+      - core-dev
+      - core
+      - all
+
+  auth:
+    container_name: auth
+    image: czertainly-auth
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Auth
+    restart: unless-stopped
+    ports:
+      - 8100:8080
+    secrets:
+      - trusted_certificates.pem
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - AUTH_DB_CONNECTION_STRING=Host=${DB_HOST};Port=${DB_PORT};Username=${DB_USERNAME};Password=${DB_PASSWORD};Database=${DB_NAME};Pooling=true
+      - AUTH_CREATE_UNKNOWN_USERS=true
+      - AUTH_CREATE_UNKNOWN_ROLES=true
+      - ASPNETCORE_URLS=http://+:8080
+    volumes:
+      - ./secrets/trusted_certificates.pem:/etc/ssl/certs/trusted_certificates.pem
+    profiles:
+      - auth-standalone
+      - core-dev
+      - core
+      - all
+
+  opa-bundle-server:
+    container_name: opa-bundles
+    image: czertainly-opa-bundles
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Auth-OPA-Policies
+    restart: unless-stopped
+    ports:
+      - 8101:8080
+    profiles:
+      - opa-bundle-server-standalone
+      - core-dev
+      - core
+      - all
+
+  scheduler:
+    container_name: scheduler
+    image: czertainly-scheduler
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Scheduler
+    restart: unless-stopped
+    ports:
+      - 8102:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_VHOST=
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    profiles:
+      - scheduler-standalone
+      - core-dev
+      - core
+      - all
+
+  core:
+    container_name: core
+    image: 3keycompany/czertainly-core:develop-latest
+#    image: czertainly-core
+#    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Core
+    restart: unless-stopped
+    ports:
+      - 8280:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+      - OPA_BASE_URL=http://opa:8181
+      - AUTH_SERVICE_BASE_URL=http://auth:8080
+      - SCHEDULER_BASE_URL=http://scheduler:8080
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_VHOST=
+      - LOGGING_LEVEL_COM_CZERTAINLY=DEBUG
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    profiles:
+      - core-standalone
+      - core
+      - all
+  
+  common-credential-provider:
+    container_name: common-credential-provider
+    image: czertainly-common-credential-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Common-Credential-Provider
+    restart: unless-stopped
+    ports:
+      - 8200:8080
+    profiles:
+      - common-credential-provider-standalone
+      - all
+
+  ejbca-ng-connector:
+    container_name: ejbca-ng-connector
+    image: czertainly-ejbca-ng-connector
+    build: 
+      context: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-EJBCA-NG-Connector
+      args:
+        - SERVER_USERNAME=${GITHUB_USERNAME}
+        - SERVER_PASSWORD=${GITHUB_PASSWORD}
+    restart: unless-stopped
+    ports:
+      - 8210:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - ejbca-ng-connector-standalone
+      - all
+
+  # ejbca-legacy-connector:
+  #   container_name: ejbca-legacy-connector
+  #   image: czertainly-ejbca-legacy-connector
+  #   build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-EJBCA-Legacy-CA-Connector
+  #   ports:
+  #       - 8211:8080
+  #   environment:
+  #     - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+  #     - JDBC_USERNAME=${DB_USERNAME}
+  #     - JDBC_PASSWORD=${DB_PASSWORD}
+  #     - SERVER_USERNAME=${GITHUB_USERNAME}
+  #     - SERVER_PASSWORD=${GITHUB_PASSWORD}
+  #   profiles:
+  #     - ejbca-legacy-connector-standalone
+  #     - all
+
+  keystore-entity-provider:
+    container_name: keystore-entity-provider
+    image: czertainly-keystore-entity-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Keystore-Entity-Provider
+    restart: unless-stopped
+    ports:
+      - 8220:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - keystore-entity-provider-standalone
+      - all
+
+  software-cryptography-provider:
+    container_name: software-cryptography-provider
+    image: czertainly-software-cryptography-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Software-Cryptography-Provider
+    ports:
+      - 8230:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - software-cryptography-provider-standalone
+      - all
+
+  ip-discovery-provider:
+    container_name: ip-discovery-provider
+    image: czertainly-ip-discovery-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-IP-Discovery-Provider
+    ports:
+      - 8240:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - ip-discovery-provider-standalone
+      - all
+
+  cryptosense-discovery-provider:
+    container_name: cryptosense-discovery-provider
+    image: czertainly-cryptosense-discovery-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Cryptosense-Discovery-Provider
+    ports:
+      - 8241:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - cryptosense-discovery-provider-standalone
+      - all
+
+  x509-compliance-provider:
+    container_name: x509-compliance-provider
+    image: czertainly-x509-compliance-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-X509-Compliance-Provider
+    ports:
+      - 8250:8080
+    profiles:
+      - x509-compliance-provider-standalone
+      - all
+
+  email-notification-provider:
+    container_name: email-notification-provider
+    image: czertainly-email-notification-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Email-Notification-Provider
+    restart: unless-stopped
+    ports:
+      - 8260:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    profiles:
+      - email-notification-provider-standalone
+      - all
+
+  # interface-docs:
+  #   container_name: interface-docs
+  #   image: czertainly-interface-docs
+  #   build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Interface-Documentation
+  #   ports:
+  #   - 8300:80
+  #   profiles:
+  #     - interface-docs-standalone
+  #     - all
+
+  ejbca:
+    container_name: ejbca
+    image: keyfactor/ejbca-ce:8.2.0.1
+    restart: unless-stopped
+    ports:
+      - 8301:8080
+      - 8302:8443
+    environment:
+      - TLS_SETUP_ENABLED=simple
+    profiles:
+      - ejbca-standalone
+      - all

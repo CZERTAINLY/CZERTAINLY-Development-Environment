@@ -1,0 +1,14 @@
+.env
+
+/data/
+
+# IDE files
+.classpath
+.project
+.settings
+target/
+.idea/
+*.iml
+
+# macOS files
+.DS_Store

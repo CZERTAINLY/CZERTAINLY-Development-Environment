@@ -1,0 +1,72 @@
+name: czertainly-database
+
+services:
+
+  postgres:
+    container_name: postgres
+    image: postgres:15-alpine
+    restart: unless-stopped
+    build: ./services/postgres
+    ports:
+      - ${DB_PORT}:5432
+    environment:
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - PGUSER=${DB_USERNAME}
+      - PGDATABASE=${DB_NAME}
+    volumes:
+      - ./data/postgres/pgsqldata:/var/lib/postgresql/data:delegated
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - database
+      - all
+
+  auth:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  core:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scheduler:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ejbca-ng-connector:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keystore-entity-provider:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  software-cryptography-provider:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ip-discovery-provider:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cryptosense-discovery-provider:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  email-notification-provider:
+    depends_on:
+      postgres:
+        condition: service_healthy
