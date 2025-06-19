@@ -115,6 +115,17 @@ services:
       - core
       - all
 
+  utils:
+    container_name: utils
+    image: czertainly-utils
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Utils-Service
+    restart: unless-stopped
+    ports:
+      - 8110:8080
+    profiles:
+      - all
+      - utils
+
   core:
     container_name: core
     image: 3keycompany/czertainly-core:develop-latest
@@ -172,6 +183,39 @@ services:
       - JDBC_PASSWORD=${DB_PASSWORD}
     profiles:
       - ejbca-ng-connector-standalone
+      - all
+
+  pyadcs-connector:
+    container_name: pyadcs-connector
+    image: czertainly-pyadcs-connector
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-PyADCS-Connector
+    ports:
+      - 8211:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+      - DATABASE_SCHEMA=pyadcs
+    profiles:
+      - pyadcs-connector-standalone
+      - all
+
+  hashicorp-vault-connector:
+    container_name: hashicorp-vault-connector
+    image: czertainly-hashicorp-vault-connector
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-HashiCorp-Vault-Connector
+    ports:
+      - 8212:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - hashicorp-vault-connector-standalone
       - all
 
   # ejbca-legacy-connector:
@@ -246,6 +290,21 @@ services:
     profiles:
       - cryptosense-discovery-provider-standalone
       - all
+  ct-logs-discovery-provider:
+    container_name: ct-logs-discovery-provider
+    image: czertainly-ct-logs-discovery-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-CT-Logs-Discovery-Provider
+    ports:
+      - 8242:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - ct-logs-discovery-provider-standalone
+      - all
 
   x509-compliance-provider:
     container_name: x509-compliance-provider
@@ -275,15 +334,15 @@ services:
       - email-notification-provider-standalone
       - all
 
-  # interface-docs:
-  #   container_name: interface-docs
-  #   image: czertainly-interface-docs
-  #   build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Interface-Documentation
-  #   ports:
-  #   - 8300:80
-  #   profiles:
-  #     - interface-docs-standalone
-  #     - all
+  interface-docs:
+    container_name: interface-docs
+    image: czertainly-interface-docs
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Interface-Documentation
+    ports:
+    - 8300:80
+    profiles:
+      - interface-docs-standalone
+      - all
 
   ejbca:
     container_name: ejbca
