@@ -190,6 +190,7 @@ services:
     container_name: pyadcs-connector
     image: czertainly-pyadcs-connector
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-PyADCS-Connector
+    restart: unless-stopped
     ports:
       - 8211:8080
     environment:
@@ -207,6 +208,7 @@ services:
     container_name: hashicorp-vault-connector
     image: czertainly-hashicorp-vault-connector
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-HashiCorp-Vault-Connector
+    restart: unless-stopped
     ports:
       - 8212:8080
     environment:
@@ -297,6 +299,7 @@ services:
     container_name: ct-logs-discovery-provider
     image: czertainly-ct-logs-discovery-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-CT-Logs-Discovery-Provider
+    restart: unless-stopped
     ports:
       - 8242:8080
     environment:
