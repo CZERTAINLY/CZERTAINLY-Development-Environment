@@ -8,7 +8,7 @@ services:
 
   opa:
     container_name: opa
-    image: openpolicyagent/opa:1.5.1-static
+    image: openpolicyagent/opa:1.9.0-static
     restart: unless-stopped
     ports:
       - 8181:8181
@@ -36,7 +36,7 @@ services:
 
   rabbitmq:
     container_name: rabbitmq
-    image: rabbitmq:3.12.0-management
+    image: rabbitmq:3.13.7-management-alpine
     restart: unless-stopped
     ports:
       - 5672:5672
@@ -254,6 +254,7 @@ services:
     container_name: software-cryptography-provider
     image: czertainly-software-cryptography-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Software-Cryptography-Provider
+    restart: unless-stopped
     ports:
       - 8230:8080
     environment:
@@ -268,6 +269,7 @@ services:
     container_name: ip-discovery-provider
     image: czertainly-ip-discovery-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-IP-Discovery-Provider
+    restart: unless-stopped
     ports:
       - 8240:8080
     environment:
@@ -311,6 +313,7 @@ services:
     container_name: x509-compliance-provider
     image: czertainly-x509-compliance-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-X509-Compliance-Provider
+    restart: unless-stopped
     ports:
       - 8250:8080
     profiles:
@@ -333,6 +336,21 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
     profiles:
       - email-notification-provider-standalone
+      - all
+  
+  webhook-notification-provider:
+    container_name: webhook-notification-provider
+    image: czertainly-webhook-notification-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Webhook-Notification-Provider
+    restart: unless-stopped
+    ports:
+      - 8261:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - webhook-notification-provider-standalone
       - all
 
   interface-docs:
