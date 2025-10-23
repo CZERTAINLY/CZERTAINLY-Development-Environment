@@ -8,7 +8,7 @@ services:
 
   opa:
     container_name: opa
-    image: openpolicyagent/opa:0.53.0-rootless
+    image: openpolicyagent/opa:1.9.0-static
     restart: unless-stopped
     ports:
       - 8181:8181
@@ -20,6 +20,7 @@ services:
     command:
       - "run"
       - "--server"
+      - "--addr=0.0.0.0:8181"
       - "--log-format=json-pretty"
       - "--set=decision_logs.console=true"
       - "--set=services.nginx.url=http://opa-bundles:8080"
@@ -35,7 +36,7 @@ services:
 
   rabbitmq:
     container_name: rabbitmq
-    image: rabbitmq:3.12.0-management
+    image: rabbitmq:3.13.7-management-alpine
     restart: unless-stopped
     ports:
       - 5672:5672
@@ -115,6 +116,17 @@ services:
       - core
       - all
 
+  utils:
+    container_name: utils
+    image: czertainly-utils
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Utils-Service
+    restart: unless-stopped
+    ports:
+      - 8110:8080
+    profiles:
+      - all
+      - utils
+
   core:
     container_name: core
     image: 3keycompany/czertainly-core:develop-latest
@@ -174,6 +186,41 @@ services:
       - ejbca-ng-connector-standalone
       - all
 
+  pyadcs-connector:
+    container_name: pyadcs-connector
+    image: czertainly-pyadcs-connector
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-PyADCS-Connector
+    restart: unless-stopped
+    ports:
+      - 8211:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+      - DATABASE_SCHEMA=pyadcs
+    profiles:
+      - pyadcs-connector-standalone
+      - all
+
+  hashicorp-vault-connector:
+    container_name: hashicorp-vault-connector
+    image: czertainly-hashicorp-vault-connector
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-HashiCorp-Vault-Connector
+    restart: unless-stopped
+    ports:
+      - 8212:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - hashicorp-vault-connector-standalone
+      - all
+
   # ejbca-legacy-connector:
   #   container_name: ejbca-legacy-connector
   #   image: czertainly-ejbca-legacy-connector
@@ -209,6 +256,7 @@ services:
     container_name: software-cryptography-provider
     image: czertainly-software-cryptography-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Software-Cryptography-Provider
+    restart: unless-stopped
     ports:
       - 8230:8080
     environment:
@@ -223,6 +271,7 @@ services:
     container_name: ip-discovery-provider
     image: czertainly-ip-discovery-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-IP-Discovery-Provider
+    restart: unless-stopped
     ports:
       - 8240:8080
     environment:
@@ -246,11 +295,28 @@ services:
     profiles:
       - cryptosense-discovery-provider-standalone
       - all
+  ct-logs-discovery-provider:
+    container_name: ct-logs-discovery-provider
+    image: czertainly-ct-logs-discovery-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-CT-Logs-Discovery-Provider
+    restart: unless-stopped
+    ports:
+      - 8242:8080
+    environment:
+      - DATABASE_HOST=${DB_HOST}
+      - DATABASE_PORT=${DB_PORT}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_USER=${DB_USERNAME}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - ct-logs-discovery-provider-standalone
+      - all
 
   x509-compliance-provider:
     container_name: x509-compliance-provider
     image: czertainly-x509-compliance-provider
     build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-X509-Compliance-Provider
+    restart: unless-stopped
     ports:
       - 8250:8080
     profiles:
@@ -274,16 +340,31 @@ services:
     profiles:
       - email-notification-provider-standalone
       - all
+  
+  webhook-notification-provider:
+    container_name: webhook-notification-provider
+    image: czertainly-webhook-notification-provider
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Webhook-Notification-Provider
+    restart: unless-stopped
+    ports:
+      - 8261:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    profiles:
+      - webhook-notification-provider-standalone
+      - all
 
-  # interface-docs:
-  #   container_name: interface-docs
-  #   image: czertainly-interface-docs
-  #   build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Interface-Documentation
-  #   ports:
-  #   - 8300:80
-  #   profiles:
-  #     - interface-docs-standalone
-  #     - all
+  interface-docs:
+    container_name: interface-docs
+    image: czertainly-interface-docs
+    build: ${CZERTAINLY_SOURCES_BASE_DIR}/CZERTAINLY-Interface-Documentation
+    ports:
+    - 8300:80
+    profiles:
+      - interface-docs-standalone
+      - all
 
   ejbca:
     container_name: ejbca
