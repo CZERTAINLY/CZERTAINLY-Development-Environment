@@ -98,7 +98,7 @@ Once the services are started, you can start the Core service in your favorite I
 
 CZERTAINLY authenticate the users using the client certificate on the mTLS enabled port. For the development purposes, you can use non-TLS port and simulate the authenticated user, you can send the `X-APP-CERTIFICATE` header with the Base64 encoded certificate.
 
-You can register the certificate for the first administrator using the [`Local API`](https://docs.czertainly.com/api/core-local/#tag/Local-operations/operation/addAdmin). For the development purposes, you can use the [`CZERTAINLY Administrator`](https://github.com/3KeyCompany/CZERTAINLY-Helm-Charts/blob/develop/dummy-certificates/certs/admin.cert.pem) certificate.
+You can register the certificate for the first administrator using the [`Local API`](https://docs.czertainly.com/api/core-local/#tag/Local-operations/operation/addAdmin). For the development purposes, you can use the [`CZERTAINLY Administrator`](https://github.com/CZERTAINLY/CZERTAINLY-Helm-Charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
 
 To create the administrator, follow [Create Super Administrator](https://docs.czertainly.com/docs/certificate-key/installation-guide/create-super-administrator).
 
