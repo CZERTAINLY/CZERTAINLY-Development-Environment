@@ -111,43 +111,47 @@ To run the Administrator frontend and use the backend services for the developme
 Create a `./src/setupProxy.js` file in the root of the repository with the following content:
 
 ```javascript
-const { createProxyMiddleware } = require('http-proxy-middleware');
+import fs from 'fs';
+import { defineConfig } from 'vite';
 
-const fs = require("fs");
-module.exports = function (app) {
-  app.use(
-    "/api",
-    createProxyMiddleware({
-      target: {
-        protocol: "http:", // this is required
-        host: "localhost",
-        hostname: "localhost",
-        port: 8443,
-        path: "/",
-        pathRewrite: function (path, req) {
-          return path.replace("/api", "");
+const localProxyConfig = defineConfig({
+    server: {
+        proxy: {
+            '/api': {
+                target: {
+                    protocol: 'http:',
+                    host: 'localhost',
+                    hostname: 'localhost',
+                    port: 8280,
+                    path: '/',
+                    pathRewrite: function (path, req) {
+                        return path.replace('/api', '');
+                    },
+                },
+                changeOrigin: true,
+                secure: false,
+                headers: {
+                    // Base64Url encoded certificate of the CZERTAINLY Administrator
+                    'X-APP-CERTIFICATE':            'MIIEtDCCApygAwIBAgIVAP15kVt62m8a4p52xmbCcNCiSx8qMA0GCSqGSIb3DQEB%0D%0ADQUAMCMxITAfBgNVBAMMGENaRVJUQUlOTFkgRHVtbXkgUm9vdCBDQTAeFw0yMjA4%0D%0AMDQwODEzMzFaFw00MjA3MzAwODEzMzFaMCMxITAfBgNVBAMMGENaRVJUQUlOTFkg%0D%0AQWRtaW5pc3RyYXRvcjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL%2FP%0D%0AWoJN2ieDZkp1JggrXjhDm%2FxrqX6acAmyqzBQujCUrbjFF8l1qdtI0fZyFrZBLeVH%0D%0ACwqQUz0Afjzj7FBMNP2ljVLrQbMfyjJG10NvuPOa9dP%2FVolgF4CRRg0Ebg5CCd0s%0D%0A3yZR%2FgIc6cl9x0Ruk8uRCpM4jZ7Y%2B%2F7jhf4%2Bc8mBlp2aRlAJtV3JOYQlux17IpJd%0D%0AJrngX%2FlKoZcp4zU9kQwunVxz5GBWhXGqMEcV6b7lGF5ocSlnrR3cUKZbdGbXcfK7%0D%0A5%2BW4%2FLB6v6y9bR40R%2BIUd%2FmOuByQvqWyTCk5d2YWBmg%2FddPVFynb5a2%2BxjhJxBI%2B%0D%0A28iGXq6iroQrPouacv8CAwEAAaOB3jCB2zAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB%0D%0A%2FwQEAwIF4DATBgNVHSUEDDAKBggrBgEFBQcDAjAdBgNVHQ4EFgQUrUOz2v0EvBSH%0D%0AyemGXPnt7HaghBgwHwYDVR0jBBgwFoAU0%2FBNVjrmoD8XW%2FNVXeoxTIkD59YwZgYD%0D%0AVR0gBF8wXTBbBgRVHSAAMFMwUQYIKwYBBQUHAgIwRRpDVVRGODpUaGlzIGlzIGEg%0D%0AZHVtbXkgYWRtaW5pc3RyYXRvciBjZXJ0aWZpY2F0ZSBmb3IgdGVzdGluZyBwdXJw%0D%0Ab3NlczANBgkqhkiG9w0BAQ0FAAOCAgEAWYlpEI8SCOnhKYpcp3n%2BBtaAoUrcwIck%0D%0ApzPPxNf%2B9LSKhPp4NEs%2BEGsfflz33IeEojck%2Bx%2FwBqggJdp7WrUsHz%2F0sAwCkrVj%0D%0Abh3Lx75msAqVqFUaX0gYbqstmbnHxqgcmseVkWmEHEOmdz0%2B%2FB0XrGagzQNW8EGW%0D%0A3PEv4yOCeqdgRt9Nyh%2BGUtVkavy%2BCkYRaIEHDGjtxJTMakXOaEU0tNmDoMBDQzLs%0D%0Aqc75AYEeqlKvQs6vZICf%2BRltDaDgriSelE04PtjnIr6aKmWipFN2Wu8Zgi3qt7SS%0D%0AiMwk0OIvG4NGkOKckf5kRWlA6aLtkY2ABHObknIlJhfpU%2FsNN%2F5ma0c%2BrSXK2%2BPy%0D%0ADStxALMzM54GVfGpXmdR3fkEQ8mS35BU2l8Gp0mA%2FXi55eqWVXgxEDXph487O20H%0D%0AjGh%2BxHcI40ZObBIKvfD0kCi1sQcINpK6CGm0Jb1ojU%2BxFwgq2IhdJPrC7quEW3wE%0D%0AHCRQKGaTbSm6CfMdf3YOKgpIUrX5Da2wJN04RTOLxUvpQss%2Frup49Uq2pMGBPtAv%0D%0AtTzXyTJrw22bgBjJV%2Bjt60ZB0PVqRbaPa52hUMl7ewCGpVO2ByAcxoQ1%2BEnb28%2FS%0D%0AwDnW3rgsaCHOB0AzqzaQAwEbgAeUKDBxKwm0GqLIgMtGs7CaG58%2FKqZsMj8ADqqI%0D%0AtY3XXAlhjb4%3D',
+                    // {
+                    //     "sub": "2d73cf2a-5339-421e-81cd-8fa0d25a100b",
+                    //     "username": "adminadmin",
+                    //     "roles": [
+                    //       "admin"
+                    //     ],
+                    //     "given_name": "admin",
+                    //     "family_name": "admin",
+                    //     "email": "admin@czertainly.com"
+                    // }
+                    'X-USERINFO':
+                        'eyJzdWIiOiIyZDczY2YyYS01MzM5LTQyMWUtODFjZC04ZmEwZDI1YTEwMGIiLCJ1c2VybmFtZSI6ImFkbWluYWRtaW4iLCJyb2xlcyI6WyJhZG1pbiJdLCJnaXZlbl9uYW1lIjoiYWRtaW4iLCJmYW1pbHlfbmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBjemVydGFpbmx5LmNvbSJ9',
+                },
+            },
         },
-      },
-      changeOrigin: true,
-      secure: false,
-      headers: {
-          // Base64Url encoded certificate of the CZERTAINLY Administrator
-        "X-APP-CERTIFICATE": "MIIEtDCCApygAwIBAgIVAP15kVt62m8a4p52xmbCcNCiSx8qMA0GCSqGSIb3DQEBDQUAMCMxITAfBgNVBAMMGENaRVJUQUlOTFkgRHVtbXkgUm9vdCBDQTAeFw0yMjA4MDQwODEzMzFaFw00MjA3MzAwODEzMzFaMCMxITAfBgNVBAMMGENaRVJUQUlOTFkgQWRtaW5pc3RyYXRvcjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL%2FPWoJN2ieDZkp1JggrXjhDm%2FxrqX6acAmyqzBQujCUrbjFF8l1qdtI0fZyFrZBLeVHCwqQUz0Afjzj7FBMNP2ljVLrQbMfyjJG10NvuPOa9dP%2FVolgF4CRRg0Ebg5CCd0s3yZR%2FgIc6cl9x0Ruk8uRCpM4jZ7Y%2B%2F7jhf4%2Bc8mBlp2aRlAJtV3JOYQlux17IpJdJrngX%2FlKoZcp4zU9kQwunVxz5GBWhXGqMEcV6b7lGF5ocSlnrR3cUKZbdGbXcfK75%2BW4%2FLB6v6y9bR40R%2BIUd%2FmOuByQvqWyTCk5d2YWBmg%2FddPVFynb5a2%2BxjhJxBI%2B28iGXq6iroQrPouacv8CAwEAAaOB3jCB2zAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB%2FwQEAwIF4DATBgNVHSUEDDAKBggrBgEFBQcDAjAdBgNVHQ4EFgQUrUOz2v0EvBSHyemGXPnt7HaghBgwHwYDVR0jBBgwFoAU0%2FBNVjrmoD8XW%2FNVXeoxTIkD59YwZgYDVR0gBF8wXTBbBgRVHSAAMFMwUQYIKwYBBQUHAgIwRRpDVVRGODpUaGlzIGlzIGEgZHVtbXkgYWRtaW5pc3RyYXRvciBjZXJ0aWZpY2F0ZSBmb3IgdGVzdGluZyBwdXJwb3NlczANBgkqhkiG9w0BAQ0FAAOCAgEAWYlpEI8SCOnhKYpcp3n%2BBtaAoUrcwIckpzPPxNf%2B9LSKhPp4NEs%2BEGsfflz33IeEojck%2Bx%2FwBqggJdp7WrUsHz%2F0sAwCkrVjbh3Lx75msAqVqFUaX0gYbqstmbnHxqgcmseVkWmEHEOmdz0%2B%2FB0XrGagzQNW8EGW3PEv4yOCeqdgRt9Nyh%2BGUtVkavy%2BCkYRaIEHDGjtxJTMakXOaEU0tNmDoMBDQzLsqc75AYEeqlKvQs6vZICf%2BRltDaDgriSelE04PtjnIr6aKmWipFN2Wu8Zgi3qt7SSiMwk0OIvG4NGkOKckf5kRWlA6aLtkY2ABHObknIlJhfpU%2FsNN%2F5ma0c%2BrSXK2%2BPyDStxALMzM54GVfGpXmdR3fkEQ8mS35BU2l8Gp0mA%2FXi55eqWVXgxEDXph487O20HjGh%2BxHcI40ZObBIKvfD0kCi1sQcINpK6CGm0Jb1ojU%2BxFwgq2IhdJPrC7quEW3wEHCRQKGaTbSm6CfMdf3YOKgpIUrX5Da2wJN04RTOLxUvpQss%2Frup49Uq2pMGBPtAvtTzXyTJrw22bgBjJV%2Bjt60ZB0PVqRbaPa52hUMl7ewCGpVO2ByAcxoQ1%2BEnb28%2FSwDnW3rgsaCHOB0AzqzaQAwEbgAeUKDBxKwm0GqLIgMtGs7CaG58%2FKqZsMj8ADqqItY3XXAlhjb4%3D",
-        // {
-        //     "sub": "2d73cf2a-5339-421e-81cd-8fa0d25a100b",
-        //     "username": "adminadmin",
-        //     "roles": [
-        //       "admin"
-        //     ],
-        //     "given_name": "admin",
-        //     "family_name": "admin",
-        //     "email": "admin@czertainly.com"
-        // }
-        "X-USERINFO": "eyJzdWIiOiIyZDczY2YyYS01MzM5LTQyMWUtODFjZC04ZmEwZDI1YTEwMGIiLCJ1c2VybmFtZSI6ImFkbWluYWRtaW4iLCJyb2xlcyI6WyJhZG1pbiJdLCJnaXZlbl9uYW1lIjoiYWRtaW4iLCJmYW1pbHlfbmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBjemVydGFpbmx5LmNvbSJ9"  
-      },
-    })
-  );
-};
+    },
+});
+
+export default localProxyConfig;
 ```
 
 This will proxy the requests from the frontend to the backend services authenticated and authorized with the certificate in the `X-APP-CERTIFICATE` header.
