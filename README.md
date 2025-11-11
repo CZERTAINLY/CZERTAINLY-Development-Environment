@@ -126,6 +126,8 @@ const proxyConfig = {
         },
     },
 };
+
+module.exports = proxyConfig;
 ```
 
 This will proxy the requests from the frontend to the backend services authenticated and authorized with the certificate in the `X-APP-CERTIFICATE` header.
