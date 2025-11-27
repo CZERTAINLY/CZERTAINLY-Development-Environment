@@ -120,7 +120,7 @@ const proxyConfig = {
                 secure: false,
                 headers: {
                     // Base64Url encoded certificate of the CZERTAINLY Administrator
-                    'ssl-client-cert': 'MIIDPTCCAiUCFBd%2BdfQuley5j4MetX3iewvIxHZDMA0GCSqGSIb3DQEBCwUAMF0xCzAJBgNVBAYTAkNaMRAwDgYDVQQIDAdDemVjaGlhMQswCQYDVQQHDAJDQjENMAsGA1UECgwEM0tFWTEMMAoGA1UECwwDREVWMRIwEAYDVQQDDAlsb2NhbGhvc3QwHhcNMjAwOTI1MTE1NDU3WhcNMzAwODA0MTE1NDU3WjBZMQswCQYDVQQGEwJDWjEQMA4GA1UECAwHQ3plY2hpYTELMAkGA1UEBwwCQ0IxCzAJBgNVBAoMAkNGMQwwCgYDVQQLDANERVYxEDAOBgNVBAMMB0NMSUVOVDEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC%2FSsO%2B9IzQ85xxyiT%2Bou8RDNxZMP0Ja8YKrdu19BTFjyLtVLpb%2BI1XqzlXFdJcObYZ5ZboyALB00i5Ds0TTs8ydgEeaw0K2O96DnGh4z5r4qLuF%2BfpVR%2B3A8kKRSrqJN1JNPFeb%2BNKsilUNvx5plZBm5%2BVTd64Sop6r1DALEDBS8AxRJSgp4x%2FoCq%2BT4zLh9XDyVUQ68axLgF86sS4YcBYKQVTH7KwRx%2BFGPFnBqt2ll2IherJ1N1dheXdLqzPYY%2BuIhs55wUPRhQibjiJhM9NgMYsmOPZRzsPIr6%2BgUil82rmSfyMg%2FA0wT4dsm6MT7ly6PPRyxoRvhNvfn96FsCRAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAI%2BYNR82n23p9014wa%2B99aEWJfujlirY07jhAQmsGTkkFM5QTNJzwi6VYnUwjlJMOXw8fEiBVRHUiyLV5RWZGiGZuLdCZgYCjtzCtWuOPidShAK5GpLDipG9upZ%2BRCNpBXVbb6J5tEI0esTSxZ%2Fjwj2JqZZayhRmRXL%2Fj8vGRn74atTILeFwUIYsSreoMI8wG1Rk0que09LgP1RmCiSl1GUSTL%2FlrK%2FdYaw0orZwUxzKg%2FKNnTYprYiAIVRsHUz8bkd6mGEBCfDdpEp0l7laBej2R8RhGDwuxjma1ZrwlCsKLlpdn2lwzqIEc%2BZl7dxiLTb1NLMH80f4LCuF1iFCD6E%3D',
+                    'ssl-client-cert': 'MIIEtDCCApygAwIBAgIVAP15kVt62m8a4p52xmbCcNCiSx8qMA0GCSqGSIb3DQEBDQUAMCMxITAfBgNVBAMMGENaRVJUQUlOTFkgRHVtbXkgUm9vdCBDQTAeFw0yMjA4MDQwODEzMzFaFw00MjA3MzAwODEzMzFaMCMxITAfBgNVBAMMGENaRVJUQUlOTFkgQWRtaW5pc3RyYXRvcjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL%2FPWoJN2ieDZkp1JggrXjhDm%2FxrqX6acAmyqzBQujCUrbjFF8l1qdtI0fZyFrZBLeVHCwqQUz0Afjzj7FBMNP2ljVLrQbMfyjJG10NvuPOa9dP%2FVolgF4CRRg0Ebg5CCd0s3yZR%2FgIc6cl9x0Ruk8uRCpM4jZ7Y%2B%2F7jhf4%2Bc8mBlp2aRlAJtV3JOYQlux17IpJdJrngX%2FlKoZcp4zU9kQwunVxz5GBWhXGqMEcV6b7lGF5ocSlnrR3cUKZbdGbXcfK75%2BW4%2FLB6v6y9bR40R%2BIUd%2FmOuByQvqWyTCk5d2YWBmg%2FddPVFynb5a2%2BxjhJxBI%2B28iGXq6iroQrPouacv8CAwEAAaOB3jCB2zAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB%2FwQEAwIF4DATBgNVHSUEDDAKBggrBgEFBQcDAjAdBgNVHQ4EFgQUrUOz2v0EvBSHyemGXPnt7HaghBgwHwYDVR0jBBgwFoAU0%2FBNVjrmoD8XW%2FNVXeoxTIkD59YwZgYDVR0gBF8wXTBbBgRVHSAAMFMwUQYIKwYBBQUHAgIwRRpDVVRGODpUaGlzIGlzIGEgZHVtbXkgYWRtaW5pc3RyYXRvciBjZXJ0aWZpY2F0ZSBmb3IgdGVzdGluZyBwdXJwb3NlczANBgkqhkiG9w0BAQ0FAAOCAgEAWYlpEI8SCOnhKYpcp3n%2BBtaAoUrcwIckpzPPxNf%2B9LSKhPp4NEs%2BEGsfflz33IeEojck%2Bx%2FwBqggJdp7WrUsHz%2F0sAwCkrVjbh3Lx75msAqVqFUaX0gYbqstmbnHxqgcmseVkWmEHEOmdz0%2B%2FB0XrGagzQNW8EGW3PEv4yOCeqdgRt9Nyh%2BGUtVkavy%2BCkYRaIEHDGjtxJTMakXOaEU0tNmDoMBDQzLsqc75AYEeqlKvQs6vZICf%2BRltDaDgriSelE04PtjnIr6aKmWipFN2Wu8Zgi3qt7SSiMwk0OIvG4NGkOKckf5kRWlA6aLtkY2ABHObknIlJhfpU%2FsNN%2F5ma0c%2BrSXK2%2BPyDStxALMzM54GVfGpXmdR3fkEQ8mS35BU2l8Gp0mA%2FXi55eqWVXgxEDXph487O20HjGh%2BxHcI40ZObBIKvfD0kCi1sQcINpK6CGm0Jb1ojU%2BxFwgq2IhdJPrC7quEW3wEHCRQKGaTbSm6CfMdf3YOKgpIUrX5Da2wJN04RTOLxUvpQss%2Frup49Uq2pMGBPtAvtTzXyTJrw22bgBjJV%2Bjt60ZB0PVqRbaPa52hUMl7ewCGpVO2ByAcxoQ1%2BEnb28%2FSwDnW3rgsaCHOB0AzqzaQAwEbgAeUKDBxKwm0GqLIgMtGs7CaG58%2FKqZsMj8ADqqItY3XXAlhjb4%3D',
                 },
             },
         },
@@ -130,10 +130,10 @@ const proxyConfig = {
 module.exports = proxyConfig;
 ```
 
-This will proxy the requests from the frontend to the backend services authenticated and authorized with the certificate in the `X-APP-CERTIFICATE` header.
+This will proxy the requests from the frontend to the backend services authenticated and authorized with the certificate in the `ssl-client-cert` header.
 
 > [!IMPORTANT]  
-> Change the values in the middleware according to your setup and desired configuration.
+> Change the values in the middleware according to your setup and desired configuration. For example, it is important to add certificates that should be trusted by services (e.g. Auth service) to `trusted_certificates.pem` secret.
 
 ## Connectors and technologies
 
