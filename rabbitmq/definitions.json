@@ -183,7 +183,7 @@
             "destination": "time-quality.config",
             "destination_type": "queue",
             "routing_key": "time-quality.config",
-          "arguments": {}
+            "arguments": {}
         },
         {
             "source": "czertainly",

@@ -487,8 +487,6 @@ services:
     image: czertainly-ntp
     build: ./ntp
     restart: unless-stopped
-    ports:
-      - 123:123/udp
     cap_add:
       - SYS_TIME
     healthcheck:
