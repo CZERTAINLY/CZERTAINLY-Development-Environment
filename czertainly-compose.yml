@@ -424,7 +424,7 @@ services:
     ports:
       - 8270:8080
     healthcheck:
-      test: wget -O - http://localhost:8080/v1/health/liveness | grep -q '{"status":"UP"}'
+      test: wget -O - http://localhost:8080/v2/health/liveness | grep -q '{"status":"UP"}'
       interval: 10s
       timeout: 5s
       retries: 5
