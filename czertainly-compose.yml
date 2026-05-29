@@ -482,11 +482,12 @@ services:
       context: ${CZERTAINLY_SOURCES_BASE_DIR}/time-quality-monitor
     restart: unless-stopped
     environment:
-      - TQC_RABBITMQ_HOST=rabbitmq
-      - TQC_RABBITMQ_PORT=5672
-      - TQC_RABBITMQ_USERNAME=guest
-      - TQC_RABBITMQ_PASSWORD=guest
-      - TQC_RABBITMQ_VHOST=
+      - MESSAGING_BROKER_TYPE=RABBITMQ
+      - MESSAGING_RABBITMQ_HOST=rabbitmq
+      - MESSAGING_RABBITMQ_PORT=5672
+      - MESSAGING_RABBITMQ_USERNAME=guest
+      - MESSAGING_RABBITMQ_PASSWORD=guest
+      - MESSAGING_RABBITMQ_VHOST=
     depends_on:
       rabbitmq:
         condition: service_healthy
