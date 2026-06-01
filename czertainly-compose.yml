@@ -482,12 +482,10 @@ services:
       context: ${CZERTAINLY_SOURCES_BASE_DIR}/time-quality-monitor
     restart: unless-stopped
     environment:
-      - MESSAGING_BROKER_TYPE=RABBITMQ
-      - MESSAGING_RABBITMQ_HOST=rabbitmq
-      - MESSAGING_RABBITMQ_PORT=5672
-      - MESSAGING_RABBITMQ_USERNAME=guest
-      - MESSAGING_RABBITMQ_PASSWORD=guest
-      - MESSAGING_RABBITMQ_VHOST=
+      - BROKER_URL=amqp://rabbitmq:5672
+      - BROKER_USERNAME=guest
+      - BROKER_PASSWORD=guest
+      - BROKER_VIRTUAL_HOST=
     depends_on:
       rabbitmq:
         condition: service_healthy
