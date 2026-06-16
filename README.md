@@ -1,17 +1,17 @@
-# CZERTAINLY-Docker-Develop-Environment
+# ILM-Docker-Develop-Environment
 
 This repository contains Docker Compose files and scripts that can be used to streamline development of the CZERTAINLY platform.
 There are couple of microservices that need to be running for the development. Depending on the service that is going to be developed, the compose will run the services.
 
 ## Source repository directory naming
 
-The `build:` paths in `czertainly-compose.yml` reference source directories under `${CZERTAINLY_SOURCES_BASE_DIR}` using their lowercase repository names (matching the `OmniTrustILM/<repo>` GitHub convention) — for example `${CZERTAINLY_SOURCES_BASE_DIR}/auth`, `${CZERTAINLY_SOURCES_BASE_DIR}/scheduler`, `${CZERTAINLY_SOURCES_BASE_DIR}/ejbca-ng-connector`.
+The `build:` paths in `ilm-compose.yml` reference source directories under `${ILM_SOURCES_BASE_DIR}` using their lowercase repository names (matching the `OmniTrustILM/<repo>` GitHub convention) — for example `${ILM_SOURCES_BASE_DIR}/auth`, `${ILM_SOURCES_BASE_DIR}/scheduler`, `${ILM_SOURCES_BASE_DIR}/ejbca-ng-connector`.
 
 > [!IMPORTANT]
 > If you previously cloned the sources under their old mixed-case names (e.g. `CZERTAINLY-Auth`, `CZERTAINLY-Scheduler`), rename the directories to the lowercase form before running `docker compose up`, otherwise the build will fail with `path not found`. Example one-liner:
 >
 > ```bash
-> for d in "$CZERTAINLY_SOURCES_BASE_DIR"/CZERTAINLY-*; do
+> for d in "$ILM_SOURCES_BASE_DIR"/CZERTAINLY-*; do
 >   new="$(basename "$d" | sed 's/^CZERTAINLY-//' | tr '[:upper:]' '[:lower:]')"
 >   mv "$d" "$(dirname "$d")/$new"
 > done
@@ -23,7 +23,7 @@ Create a `.env` file in the root of the repository and update values. The `.env.
 
 | Variable                    | Description                                                                                             |
 |-----------------------------|---------------------------------------------------------------------------------------------------------|
-| CZERTAINLY_SOURCES_BASE_DIR | Path to the directory where the CZERTAINLY sources are located for building the images.                 |
+| ILM_SOURCES_BASE_DIR | Path to the directory where the ILM sources are located for building the images.                 |
 | DB_HOST                     | Hostname of the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker.  |
 | DB_PORT                     | Port of the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker.      |
 | DB_USERNAME                 | Username for the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker. |
@@ -48,44 +48,44 @@ The file contains the CA certificate in the PEM format. You can add multiple cer
 > ```
 > If you are using the dummy certificates for development (see [Authentication](#authentication)), add the [ILM Dummy Root CA](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/root-ca.cert.pem) to this file and restart the `auth` service:
 > ```bash
-> docker compose -f czertainly-compose.yml -f postgres-compose.yml --profile core restart auth
+> docker compose -f ilm-compose.yml -f postgres-compose.yml --profile core restart auth
 > ```
 
 ## Quick start
 
-Copy the `.env.example` file to `.env` and update the `CZERTAINLY_SOURCES_BASE_DIR` with the path to the CZERTAINLY sources on your local.
+Copy the `.env.example` file to `.env` and update the `ILM_SOURCES_BASE_DIR` with the path to the ILM sources on your local.
 For a quick start, you can use the following command to start the environment for the core services using the PostgreSQL database in docker:
 
 ```bash
-docker-compose -f czertainly-compose.yml -f postgres-compose.yml --profile database --profile core up
+docker-compose -f ilm-compose.yml -f postgres-compose.yml --profile database --profile core up
 ```
 
-This should merge both `czertainly-compose.yml` and `postgres-compose.yml` compose file and start the PostgreSQL database and the core services according to the profiles `database` and `core`.
+This should merge both `ilm-compose.yml` and `postgres-compose.yml` compose file and start the PostgreSQL database and the core services according to the profiles `database` and `core`.
 
 To stop the services, you can use the following command:
 
 ```bash
-docker-compose -f czertainly-compose.yml -f postgres-compose.yml --profile database --profile core down
+docker-compose -f ilm-compose.yml -f postgres-compose.yml --profile database --profile core down
 ```
 
 ## RabbitMQ
 
-The `rabbitmq` service mounts `./rabbitmq/definitions.json` and `./rabbitmq/rabbitmq.conf` into the container. On boot the broker imports the topology (vhost, `czertainly` exchange, `core.*` queues, bindings, and the `guest` admin user) from `definitions.json`. The data directory is bind-mounted at `./data/rabbitmq/data` so broker state persists across restarts.
+The `rabbitmq` service mounts `./rabbitmq/definitions.json` and `./rabbitmq/rabbitmq.conf` into the container. On boot the broker imports the topology (vhost, `ilm` exchange, `core.*` queues, bindings, and the `guest` admin user) from `definitions.json`. The data directory is bind-mounted at `./data/rabbitmq/data` so broker state persists across restarts.
 
 > [!IMPORTANT]
 > If you upgrade an existing dev environment that already has data in `./data/rabbitmq/data` and the broker logs `PRECONDITION_FAILED` errors during definitions import (typically because previously-created queues have different attributes than the new declarations), wipe the persisted state and restart:
 >
 > ```bash
-> docker compose -f czertainly-compose.yml down
+> docker compose -f ilm-compose.yml down
 > rm -rf ./data/rabbitmq/data
-> docker compose -f czertainly-compose.yml --profile core up
+> docker compose -f ilm-compose.yml --profile core up
 > ```
 >
 > The next boot will import `definitions.json` against an empty Mnesia store and the topology will match the file exactly.
 
 ## Database
 
-CZERTAINLY requires a PostgreSQL database to store the data. The database can be started in Docker using the `postgres-compose.yml` file or you can use your own database.
+ILM requires a PostgreSQL database to store the data. The database can be started in Docker using the `postgres-compose.yml` file or you can use your own database.
 The database access is configured using [environment variables](#setup-the-environment-variables) in the `.env` file.
 
 ### Using the PostgreSQL in Docker
@@ -112,11 +112,11 @@ To remove the data and start the database from scratch, you should remove the `.
 
 ## Profiles
 
-The `czertainly-compose.yml` file contains profiles that can be used to start the required services based on what you are going to work on. The profiles are:
+The `ilm-compose.yml` file contains profiles that can be used to start the required services based on what you are going to work on. The profiles are:
 
 | Profile    | Services                                                                                                                                                                                                                                                                                                  | Description                                                              |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `core`     | `opa` `rabbitmq` `auth` `opa-bundle-server` `scheduler` `core`                                                                                                                                                                                                                                            | Starts the core services of the CZERTAINLY platform.                     |
+| `core`     | `opa` `rabbitmq` `auth` `opa-bundle-server` `scheduler` `core`                                                                                                                                                                                                                                            | Starts the core services of the ILM platform.                     |
 | `database` | `postgres`                                                                                                                                                                                                                                                                                                | Starts the PostgreSQL database.                                          |
 | `core-dev` | `opa` `rabbitmq` `auth` `opa-bundle-server` `scheduler`                                                                                                                                                                                                                                                   | Starts services that are needed for the development of the Core service. |
 | `all`      | `opa` `rabbitmq` `auth` `opa-bundle-server` `scheduler` `core` `postgres` `common-credential-provider` `ejbca-ng-connector` `keystore-entity-provider` `software-cryptography-provider` `ip-discovery-provider` `cryptosense-discovery-provider` `x509-compliance-provider` `email-notification-provider` | Starts all services.                                                     |
@@ -128,19 +128,19 @@ Each service can be started separately using the profile with name `[service nam
 To start the services that are needed for the development of the Core service, you can use the `core-dev` profile:
 
 ```bash
-docker-compose -f czertainly-compose.yml --profile core-dev up
+docker-compose -f ilm-compose.yml --profile core-dev up
 ```
 
 Once the services are started, you can start the Core service in your favorite IDE and connect to the running services.
 
 ## Authentication
 
-CZERTAINLY authenticate the users using the client certificate on the mTLS enabled port. For the development purposes, you can use non-TLS port and simulate the authenticated user by sending the `ssl-client-cert` header with the URL-encoded Base64 certificate.
+ILM authenticate the users using the client certificate on the mTLS enabled port. For the development purposes, you can use non-TLS port and simulate the authenticated user by sending the `ssl-client-cert` header with the URL-encoded Base64 certificate.
 
 > [!IMPORTANT]
 > The certificate value must be **URL-encoded** (e.g. `+` → `%2B`, `=` → `%3D`). Sending a plain Base64 value will cause the `+` characters to be interpreted as spaces, resulting in an authentication error.
 
-You can register the certificate for the first administrator using the [`Local API`](https://docs.czertainly.com/api/core-local/#tag/Local-operations/operation/addAdmin). For the development purposes, you can use the [`ILM Administrator`](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
+You can register the certificate for the first administrator using the [`Local API`](https://docs.otilm.com/api/core-local/#tag/Local-operations). For the development purposes, you can use the [`ILM Administrator`](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
 
 > [!IMPORTANT]
 > The Local API listens only on the container's internal port `8080` and requires no authentication. The externally-mapped port `8280` exposes the regular API, which requires client-cert auth and returns HTTP 401 without one. Use `docker exec` to call the Local API from inside the container:
@@ -151,9 +151,9 @@ You can register the certificate for the first administrator using the [`Local A
 >   http://localhost:8080/api/v1/local/admins
 > ```
 
-To create the administrator, follow [Create Super Administrator](https://docs.czertainly.com/docs/certificate-key/installation-guide/create-super-administrator).
+To create the administrator, follow [Create Super Administrator](https://docs.otilm.com/docs/certificate-key/installation-guide/create-super-administrator).
 
-Additional user and roles can be added using the CZERTAINLY API or Administrator UI.
+Additional user and roles can be added using the ILM- API or Administrator UI.
 
 ## Administrator frontend
 

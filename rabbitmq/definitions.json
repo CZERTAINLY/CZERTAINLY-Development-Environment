@@ -26,7 +26,7 @@
     ],
     "exchanges": [
         {
-            "name": "czertainly",
+            "name": "ilm",
             "vhost": "/",
             "type": "direct",
             "durable": true,
@@ -124,7 +124,7 @@
     ],
     "bindings": [
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.audit-logs",
             "destination_type": "queue",
@@ -133,7 +133,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.notifications",
             "destination_type": "queue",
@@ -142,7 +142,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.actions",
             "destination_type": "queue",
@@ -151,7 +151,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.scheduler",
             "destination_type": "queue",
@@ -160,7 +160,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.validation",
             "destination_type": "queue",
@@ -169,7 +169,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "core.events",
             "destination_type": "queue",
@@ -178,7 +178,7 @@
             }
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "time-quality.config",
             "destination_type": "queue",
@@ -186,7 +186,7 @@
             "arguments": {}
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "time-quality.config-request",
             "destination_type": "queue",
@@ -194,7 +194,7 @@
             "arguments": {}
         },
         {
-            "source": "czertainly",
+            "source": "ilm",
             "vhost": "/",
             "destination": "time-quality.results",
             "destination_type": "queue",
