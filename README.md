@@ -1,6 +1,6 @@
 # ILM-Docker-Develop-Environment
 
-This repository contains Docker Compose files and scripts that can be used to streamline development of the CZERTAINLY platform.
+This repository contains Docker Compose files and scripts that can be used to streamline development of the ILM platform.
 There are couple of microservices that need to be running for the development. Depending on the service that is going to be developed, the compose will run the services.
 
 ## Source repository directory naming
@@ -140,7 +140,7 @@ ILM authenticate the users using the client certificate on the mTLS enabled port
 > [!IMPORTANT]
 > The certificate value must be **URL-encoded** (e.g. `+` → `%2B`, `=` → `%3D`). Sending a plain Base64 value will cause the `+` characters to be interpreted as spaces, resulting in an authentication error.
 
-You can register the certificate for the first administrator using the [`Local API`](https://docs.otilm.com/api/core-local/#tag/Local-operations). For the development purposes, you can use the [`ILM Administrator`](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
+You can register the certificate for the first administrator using the [`Local API`](https://docs.otilm.com/api/core-local/#tag/Local-operations/operation/addAdmin). For the development purposes, you can use the [`ILM Administrator`](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
 
 > [!IMPORTANT]
 > The Local API listens only on the container's internal port `8080` and requires no authentication. The externally-mapped port `8280` exposes the regular API, which requires client-cert auth and returns HTTP 401 without one. Use `docker exec` to call the Local API from inside the container:
@@ -153,7 +153,7 @@ You can register the certificate for the first administrator using the [`Local A
 
 To create the administrator, follow [Create Super Administrator](https://docs.otilm.com/docs/certificate-key/installation-guide/create-super-administrator).
 
-Additional user and roles can be added using the ILM- API or Administrator UI.
+Additional user and roles can be added using the ILM API or Administrator UI.
 
 ## Administrator frontend
 

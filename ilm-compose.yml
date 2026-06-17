@@ -161,7 +161,7 @@ services:
       - BROKER_USERNAME=guest
       - BROKER_PASSWORD=guest
       - BROKER_VIRTUAL_HOST=
-      - LOGGING_LEVEL_COM_ILM=DEBUG
+      - LOGGING_LEVEL_COM_OTILM=DEBUG
     depends_on:
       rabbitmq:
         condition: service_healthy
