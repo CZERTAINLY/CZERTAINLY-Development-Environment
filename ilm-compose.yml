@@ -1,4 +1,4 @@
-name: czertainly
+name: ilm
 
 secrets:
   trusted_certificates.pem:
@@ -58,8 +58,8 @@ services:
 
   auth:
     container_name: auth
-    image: czertainly-auth
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/auth
+    image: ilm-auth
+    build: ${ILM_SOURCES_BASE_DIR}/auth
     restart: unless-stopped
     ports:
       - 8100:8080
@@ -86,8 +86,8 @@ services:
 
   opa-bundle-server:
     container_name: opa-bundles
-    image: czertainly-opa-bundles
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/auth-opa-policies
+    image: ilm-opa-bundles
+    build: ${ILM_SOURCES_BASE_DIR}/auth-opa-policies
     restart: unless-stopped
     ports:
       - 8101:8080
@@ -99,8 +99,8 @@ services:
 
   scheduler:
     container_name: scheduler
-    image: czertainly-scheduler
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/scheduler
+    image: ilm-scheduler
+    build: ${ILM_SOURCES_BASE_DIR}/scheduler
     restart: unless-stopped
     ports:
       - 8102:8080
@@ -128,8 +128,8 @@ services:
 
   utils:
     container_name: utils
-    image: czertainly-utils
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/utils-service
+    image: ilm-utils
+    build: ${ILM_SOURCES_BASE_DIR}/utils-service
     restart: unless-stopped
     ports:
       - 8110:8080
@@ -144,9 +144,9 @@ services:
 
   core:
     container_name: core
-    image: 3keycompany/czertainly-core:develop-latest
-    #    image: czertainly-core
-    #    build: ${CZERTAINLY_SOURCES_BASE_DIR}/core
+    image: hub.omnitrustregistry.com/ilm/core:develop-latest
+    #    image: ilm-core
+    #    build: ${ILM_SOURCES_BASE_DIR}/core
     restart: unless-stopped
     ports:
       - 8280:8080
@@ -161,7 +161,7 @@ services:
       - BROKER_USERNAME=guest
       - BROKER_PASSWORD=guest
       - BROKER_VIRTUAL_HOST=
-      - LOGGING_LEVEL_COM_CZERTAINLY=DEBUG
+      - LOGGING_LEVEL_COM_OTILM=DEBUG
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -177,8 +177,8 @@ services:
 
   common-credential-provider:
     container_name: common-credential-provider
-    image: czertainly-common-credential-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/common-credential-provider
+    image: ilm-common-credential-provider
+    build: ${ILM_SOURCES_BASE_DIR}/common-credential-provider
     restart: unless-stopped
     ports:
       - 8200:8080
@@ -197,9 +197,9 @@ services:
 
   ejbca-ng-connector:
     container_name: ejbca-ng-connector
-    image: czertainly-ejbca-ng-connector
+    image: ilm-ejbca-ng-connector
     build:
-      context: ${CZERTAINLY_SOURCES_BASE_DIR}/ejbca-ng-connector
+      context: ${ILM_SOURCES_BASE_DIR}/ejbca-ng-connector
       args:
         - SERVER_USERNAME=${GITHUB_USERNAME}
         - SERVER_PASSWORD=${GITHUB_PASSWORD}
@@ -221,8 +221,8 @@ services:
 
   pyadcs-connector:
     container_name: pyadcs-connector
-    image: czertainly-pyadcs-connector
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/pyadcs-connector
+    image: ilm-pyadcs-connector
+    build: ${ILM_SOURCES_BASE_DIR}/pyadcs-connector
     restart: unless-stopped
     ports:
       - 8211:8080
@@ -239,8 +239,8 @@ services:
 
   hashicorp-vault-connector:
     container_name: hashicorp-vault-connector
-    image: czertainly-hashicorp-vault-connector
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/hashicorp-vault-connector
+    image: ilm-hashicorp-vault-connector
+    build: ${ILM_SOURCES_BASE_DIR}/hashicorp-vault-connector
     restart: unless-stopped
     ports:
       - 8212:8080
@@ -261,8 +261,8 @@ services:
 
   # ejbca-legacy-connector:
   #   container_name: ejbca-legacy-connector
-  #   image: czertainly-ejbca-legacy-connector
-  #   build: ${CZERTAINLY_SOURCES_BASE_DIR}/ejbca-legacy-ca-connector
+  #   image: ilm-ejbca-legacy-connector
+  #   build: ${ILM_SOURCES_BASE_DIR}/ejbca-legacy-ca-connector
   #   ports:
   #       - 8211:8080
   #   environment:
@@ -277,8 +277,8 @@ services:
 
   keystore-entity-provider:
     container_name: keystore-entity-provider
-    image: czertainly-keystore-entity-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/keystore-entity-provider
+    image: ilm-keystore-entity-provider
+    build: ${ILM_SOURCES_BASE_DIR}/keystore-entity-provider
     restart: unless-stopped
     ports:
       - 8220:8080
@@ -297,8 +297,8 @@ services:
 
   software-cryptography-provider:
     container_name: software-cryptography-provider
-    image: czertainly-software-cryptography-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/software-cryptography-provider
+    image: ilm-software-cryptography-provider
+    build: ${ILM_SOURCES_BASE_DIR}/software-cryptography-provider
     restart: unless-stopped
     ports:
       - 8230:8080
@@ -317,8 +317,8 @@ services:
 
   ip-discovery-provider:
     container_name: ip-discovery-provider
-    image: czertainly-ip-discovery-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/ip-discovery-provider
+    image: ilm-ip-discovery-provider
+    build: ${ILM_SOURCES_BASE_DIR}/ip-discovery-provider
     restart: unless-stopped
     ports:
       - 8240:8080
@@ -337,8 +337,8 @@ services:
 
   cryptosense-discovery-provider:
     container_name: cryptosense-discovery-provider
-    image: czertainly-cryptosense-discovery-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/cryptosense-discovery-provider
+    image: ilm-cryptosense-discovery-provider
+    build: ${ILM_SOURCES_BASE_DIR}/cryptosense-discovery-provider
     ports:
       - 8241:8080
     environment:
@@ -356,8 +356,8 @@ services:
 
   ct-logs-discovery-provider:
     container_name: ct-logs-discovery-provider
-    image: czertainly-ct-logs-discovery-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/ct-logs-discovery-provider
+    image: ilm-ct-logs-discovery-provider
+    build: ${ILM_SOURCES_BASE_DIR}/ct-logs-discovery-provider
     restart: unless-stopped
     ports:
       - 8242:8080
@@ -378,8 +378,8 @@ services:
 
   x509-compliance-provider:
     container_name: x509-compliance-provider
-    image: czertainly-x509-compliance-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/x509-compliance-provider
+    image: ilm-x509-compliance-provider
+    build: ${ILM_SOURCES_BASE_DIR}/x509-compliance-provider
     restart: unless-stopped
     ports:
       - 8250:8080
@@ -394,8 +394,8 @@ services:
 
   email-notification-provider:
     container_name: email-notification-provider
-    image: czertainly-email-notification-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/email-notification-provider
+    image: ilm-email-notification-provider
+    build: ${ILM_SOURCES_BASE_DIR}/email-notification-provider
     restart: unless-stopped
     ports:
       - 8260:8080
@@ -417,9 +417,9 @@ services:
 
   timestamp-signature-formatter:
     container_name: timestamp-signature-formatter
-    image: czertainly-timestamp-signature-formatter
+    image: ilm-timestamp-signature-formatter
     build:
-      context: ${CZERTAINLY_SOURCES_BASE_DIR}/timestamp-formatter-connector
+      context: ${ILM_SOURCES_BASE_DIR}/timestamp-formatter-connector
     restart: unless-stopped
     ports:
       - 8270:8080
@@ -434,8 +434,8 @@ services:
 
   webhook-notification-provider:
     container_name: webhook-notification-provider
-    image: czertainly-webhook-notification-provider
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/webhook-notification-provider
+    image: ilm-webhook-notification-provider
+    build: ${ILM_SOURCES_BASE_DIR}/webhook-notification-provider
     restart: unless-stopped
     ports:
       - 8261:8080
@@ -454,8 +454,8 @@ services:
 
   interface-docs:
     container_name: interface-docs
-    image: czertainly-interface-docs
-    build: ${CZERTAINLY_SOURCES_BASE_DIR}/interface-documentation
+    image: ilm-interface-docs
+    build: ${ILM_SOURCES_BASE_DIR}/interface-documentation
     ports:
       - 8300:80
     profiles:
@@ -477,9 +477,9 @@ services:
 
   time-quality-monitor:
     container_name: time-quality-monitor
-    image: czertainly-time-quality-monitor
+    image: ilm-time-quality-monitor
     build:
-      context: ${CZERTAINLY_SOURCES_BASE_DIR}/time-quality-monitor
+      context: ${ILM_SOURCES_BASE_DIR}/time-quality-monitor
     restart: unless-stopped
     environment:
       - BROKER_URL=amqp://rabbitmq:5672
@@ -500,7 +500,7 @@ services:
 
   ntp:
     container_name: ntp
-    image: czertainly-ntp
+    image: ilm-ntp
     build: ./ntp
     restart: unless-stopped
     cap_add:
