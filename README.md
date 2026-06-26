@@ -188,6 +188,37 @@ This will proxy the requests from the frontend to the backend services authentic
 > The certificate value must be URL-encoded. To generate the value for your own certificate, use `node -e "console.log(encodeURIComponent('<base64_cert>'))"`.
 > It is important to add certificates that should be trusted by the Auth service to `trusted_certificates.pem` (see [Trusted CA certificates](#trusted-ca-certificates)).
 
+## Scripts
+
+The `scripts/` directory contains helper scripts for one-time setup tasks.
+
+### `bootstrap-first-admin.sh`
+
+Registers the first administrator account by POSTing `scripts/first-admin.json` to the Local API. This is the script equivalent of the `docker exec` command shown in the [Authentication](#authentication) section above — use whichever is more convenient.
+
+```bash
+# Core running in the IDE (default port 8080)
+./scripts/bootstrap-first-admin.sh --client-cert-pem /path/to/admin.cert.pem
+
+# Core running via docker-compose (mapped to host port 8280)
+./scripts/bootstrap-first-admin.sh --ilm-host http://localhost:8280
+```
+
+Run `./scripts/bootstrap-first-admin.sh --help` for the full option list.
+
+### `timestamping-setup.sh`
+
+End-to-end provisioning script that creates all ILM objects required for a timestamping environment: five connectors, a SoftKeyStore credential, an EJBCA authority, a soft token and token profile, a Time Quality configuration, a vault instance and vault profile, a mapped user and role, and two TSA sets (non-qualified and qualified) each with a key pair, RA profile, certificate, TSP profile, signing profile, and Basic credential.
+
+```bash
+./scripts/timestamping-setup.sh \
+  --pkcs12-bundle /path/to/ejbca-client.p12 \
+  --certificate-dn "CN=tsa.example.com" \
+  --client-cert-pem /path/to/admin.cert.pem
+```
+
+Run `./scripts/timestamping-setup.sh --help` for the full option list (connector ports, EJBCA profiles, object name bases, polling tunables, and more).
+
 ## Connectors and technologies
 
 To have a complete setup, you will need to have a technology available for the connectors. For example, if you would like to work with the Authority Provider functions, you should have appropriate connector running that is able to communicate with the target technology.
