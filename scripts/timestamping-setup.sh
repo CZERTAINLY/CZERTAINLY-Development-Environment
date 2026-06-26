@@ -1603,7 +1603,7 @@ setup_signing_profile() {
   sig_scheme_uuid=$(attr_uuid "$sig_attrs" "data_rsaSigScheme" "string")
   sig_digest_uuid=$(attr_uuid "$sig_attrs" "data_sigDigest"    "string")
 
-  log "Fetching Signature Formatting Provider connector attributes..."
+  log "Fetching timestamp-formatting-connector attributes..."
   formatting_attrs=$(ilm_curl GET \
     "/v1/signingProfiles/signatureFormattingConnectors/${timestamp_formatting_conn_uuid}/formattingAttributes" \
     | jq '[.[] | .version = ("v" + (.version | tostring))]')
