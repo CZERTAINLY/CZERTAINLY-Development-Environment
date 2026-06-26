@@ -6,7 +6,7 @@
 # must also be reflected in that script.
 #
 # Automates the ILM timestamping environment setup:
-#   1. Creates five connectors (credential-provider v1, EJBCA, crypto-provider, signature-formatter,
+#   1. Creates five connectors (credential-provider v1, EJBCA, crypto-provider, timestamp-formatting-connector,
 #      and a credential-provider v2 registration used as the vault via its `secret` interface)
 #   2. Creates a SoftKeyStore credential from a PKCS12 bundle
 #   3. Creates an EJBCA authority instance
@@ -52,7 +52,7 @@ CONNECTOR_HOST="localhost"
 PORT_CRED_PROVIDER="8200"
 PORT_EJBCA="8210"
 PORT_CRYPTO_PROVIDER="8230"
-PORT_FORMATTER="8270"
+PORT_TIMESTAMP_FORMATTING="8270"
 
 PKCS12_BUNDLE=""
 PKCS12_PASSWORD="00000000"
@@ -73,7 +73,7 @@ KEY_NAME_BASE="tsa-rsa"           # -non-qualified / -qualified appended
 RA_PROFILE_NAME_BASE="tsa"        # -non-qualified / -qualified appended
 TSP_PROFILE_NAME_BASE="tsp"       # -non-qualified / -qualified appended
 SIGNING_PROFILE_NAME_BASE="tsa"   # -non-qualified / -qualified appended
-FORMATTER_CONNECTOR_NAME="signature-formatter"
+TIMESTAMP_FORMATTING_CONNECTOR_NAME="timestamp-formatting-connector"
 
 # Vault backing for TSP Basic credentials.
 # The common-credential-provider, when registered as a v2 connector, exposes the `secret`
@@ -126,7 +126,7 @@ MTLS_KEY_PEM=""             # mtls mode: temp file holding client key extracted 
 CRED_CONN_UUID=""
 EJBCA_CONN_UUID=""
 CRYPTO_CONN_UUID=""
-FORMATTER_CONN_UUID=""
+TIMESTAMP_FORMATTING_CONN_UUID=""
 VAULT_CONN_UUID=""
 CRED_UUID=""
 AUTH_UUID=""
@@ -168,15 +168,15 @@ Required:
   Plus the admin credential for the chosen --auth-mode (see "ILM API auth").
 
 Connector options (defaults: localhost, ports 8200/8210/8230/8270):
-  --connector-host HOST       Hostname for connectors as seen from ILM server
-  --port-cred-provider PORT   common-credential-provider port     (default: 8200)
-  --port-ejbca PORT           ejbca-ng-connector port             (default: 8210)
-  --port-crypto-provider PORT software-cryptography-provider port (default: 8230)
-  --port-formatter PORT       signature-formatter-connector port  (default: 8270)
-  --formatter-connector-name NAME
-                              Signature Formatter Connector name  (default: signature-formatter)
-  --vault-connector-name NAME credential-provider v2 connector used as vault
-                              (default: common-credential-provider-v2; runs on --port-cred-provider)
+  --connector-host HOST            hostname for connectors as seen from ILM server
+  --port-cred-provider PORT        common-credential-provider port     (default: 8200)
+  --port-ejbca PORT                ejbca-ng-connector port             (default: 8210)
+  --port-crypto-provider PORT      software-cryptography-provider port (default: 8230)
+  --port-timestamp-formatting PORT timestamp-formatting-connector port (default: 8270)
+  --timestamp-formatting-connector-name NAME
+                                   timestamp formatting connector name (default: timestamp-formatting-connector)
+  --vault-connector-name NAME      credential-provider v2 connector used as vault
+                                   (default: common-credential-provider-v2; runs on --port-cred-provider)
 
 Vault / Basic credential options:
   --vault-instance-name NAME  Vault instance name (created if absent; default: vault)
@@ -340,8 +340,8 @@ parse_args() {
       --port-cred-provider)                     PORT_CRED_PROVIDER="$2";                     shift 2 ;;
       --port-ejbca)                             PORT_EJBCA="$2";                             shift 2 ;;
       --port-crypto-provider)                   PORT_CRYPTO_PROVIDER="$2";                   shift 2 ;;
-      --port-formatter)                         PORT_FORMATTER="$2";                         shift 2 ;;
-      --formatter-connector-name)               FORMATTER_CONNECTOR_NAME="$2";               shift 2 ;;
+      --port-timestamp-formatting)              PORT_TIMESTAMP_FORMATTING="$2";              shift 2 ;;
+      --timestamp-formatting-connector-name)    TIMESTAMP_FORMATTING_CONNECTOR_NAME="$2";    shift 2 ;;
       --vault-connector-name)                   VAULT_CONNECTOR_NAME="$2";                   shift 2 ;;
       --vault-instance-name)                    VAULT_INSTANCE_NAME="$2";                    shift 2 ;;
       --vault-profile-name)                     VAULT_PROFILE_NAME="$2";                     shift 2 ;;
@@ -550,10 +550,10 @@ setup_connectors() {
     create_crypto_connector
   ok "software-cryptography-provider  $CRYPTO_CONN_UUID"
 
-  discover_or_create_connector FORMATTER_CONN_UUID "signature-formatter" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="signatureFormatting" and ((.features // []) | index("timestamping")))' \
-    create_formatter_connector
-  ok "signature-formatter  $FORMATTER_CONN_UUID"
+    create_timestamp_formatting_connector
+  ok "timestamp-formatting-connector  $TIMESTAMP_FORMATTING_CONN_UUID"
 
   discover_or_create_connector VAULT_CONN_UUID "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="secret")' \
@@ -571,11 +571,11 @@ create_connector() {
   require_uuid "$_resp" "${name} connector"
 }
 
-create_cred_connector()      { create_connector "common-credential-provider"    "$PORT_CRED_PROVIDER"   "v1" "credential-provider connector (port ${PORT_CRED_PROVIDER})"; }
-create_ejbca_connector()     { create_connector "ejbca-ng-connector"             "$PORT_EJBCA"           "v1" "ejbca-ng connector (port ${PORT_EJBCA})"; }
-create_crypto_connector()    { create_connector "software-cryptography-provider" "$PORT_CRYPTO_PROVIDER" "v1" "software-cryptography-provider connector (port ${PORT_CRYPTO_PROVIDER})"; }
-create_formatter_connector() { create_connector "$FORMATTER_CONNECTOR_NAME"      "$PORT_FORMATTER"       "v2" "signature-formatter connector (port ${PORT_FORMATTER})"; }
-create_vault_connector()     { create_connector "$VAULT_CONNECTOR_NAME"          "$PORT_CRED_PROVIDER"   "v2" "credential-provider v2 connector for vault use (port ${PORT_CRED_PROVIDER})"; }
+create_cred_connector()                 { create_connector "common-credential-provider"           "$PORT_CRED_PROVIDER"        "v1" "credential-provider connector (port ${PORT_CRED_PROVIDER})"; }
+create_ejbca_connector()                { create_connector "ejbca-ng-connector"                   "$PORT_EJBCA"                "v1" "ejbca-ng connector (port ${PORT_EJBCA})"; }
+create_crypto_connector()               { create_connector "software-cryptography-provider"       "$PORT_CRYPTO_PROVIDER"      "v1" "software-cryptography-provider connector (port ${PORT_CRYPTO_PROVIDER})"; }
+create_timestamp_formatting_connector() { create_connector "$TIMESTAMP_FORMATTING_CONNECTOR_NAME" "$PORT_TIMESTAMP_FORMATTING" "v2" "timestamp-formatting-connector (port ${PORT_TIMESTAMP_FORMATTING})"; }
+create_vault_connector()                { create_connector "$VAULT_CONNECTOR_NAME"                "$PORT_CRED_PROVIDER"        "v2" "credential-provider v2 connector for vault use (port ${PORT_CRED_PROVIDER})"; }
 
 # --- Step 2: Credential -------------------------------------------------------
 setup_credential() {
@@ -1569,14 +1569,14 @@ setup_tsp_basic_credential() {
 }
 
 # --- Step 15: Signing Profile -------------------------------------------------
-# Usage: setup_signing_profile <sp_name> <cert_uuid> <policy_oid> <time_quality_uuid> <formatter_conn_uuid> <out_sp_uuid_var>
+# Usage: setup_signing_profile <sp_name> <cert_uuid> <policy_oid> <time_quality_uuid> <timestamp_formatting_conn_uuid> <out_sp_uuid_var>
 #
 # Pass a non-empty <time_quality_uuid> for the qualified profile to enable
 # qualifiedTimestamp and link to the Time Quality configuration.
 # Pass an empty string for the non-qualified profile.
 setup_signing_profile() {
-  local sp_name="$1" cert_uuid="$2" policy_oid="$3" time_quality_uuid="$4" formatter_conn_uuid="$5" out_sp_uuid="$6"
-  local _resp sig_attrs sig_scheme_uuid sig_digest_uuid _sp_uuid formatter_attrs
+  local sp_name="$1" cert_uuid="$2" policy_oid="$3" time_quality_uuid="$4" timestamp_formatting_conn_uuid="$5" out_sp_uuid="$6"
+  local _resp sig_attrs sig_scheme_uuid sig_digest_uuid _sp_uuid formatting_attrs
   local qualified_timestamp _existing _list
 
   _list=$(list_paginated /v1/signingProfiles/list)
@@ -1603,30 +1603,30 @@ setup_signing_profile() {
   sig_scheme_uuid=$(attr_uuid "$sig_attrs" "data_rsaSigScheme" "string")
   sig_digest_uuid=$(attr_uuid "$sig_attrs" "data_sigDigest"    "string")
 
-  log "Fetching signature formatter connector attributes..."
-  formatter_attrs=$(ilm_curl GET \
-    "/v1/signingProfiles/signatureFormatterConnectors/${formatter_conn_uuid}/formatterAttributes" \
+  log "Fetching timestamp-formatting-connector attributes..."
+  formatting_attrs=$(ilm_curl GET \
+    "/v1/signingProfiles/signatureFormattingConnectors/${timestamp_formatting_conn_uuid}/formattingAttributes" \
     | jq '[.[] | .version = ("v" + (.version | tostring))]')
 
   log "Creating Signing Profile '${sp_name}'..."
   _resp=$(ilm_curl POST /v1/signingProfiles -d \
     "$(jq -n \
-      --arg  name                  "$sp_name" \
-      --arg  policyOid             "$policy_oid" \
-      --arg  certUuid              "$cert_uuid" \
-      --arg  sigSchemeUuid         "$sig_scheme_uuid" \
-      --arg  sigDigestUuid         "$sig_digest_uuid" \
-      --argjson qualifiedTimestamp "$qualified_timestamp" \
-      --arg  timeQualityUuid       "$time_quality_uuid" \
-      --arg  formatterConnUuid     "$formatter_conn_uuid" \
-      --argjson formatterAttrs     "$formatter_attrs" \
+      --arg  name                        "$sp_name" \
+      --arg  policyOid                   "$policy_oid" \
+      --arg  certUuid                    "$cert_uuid" \
+      --arg  sigSchemeUuid               "$sig_scheme_uuid" \
+      --arg  sigDigestUuid               "$sig_digest_uuid" \
+      --argjson qualifiedTimestamp       "$qualified_timestamp" \
+      --arg  timeQualityUuid             "$time_quality_uuid" \
+      --arg  timestampFormattingConnUuid "$timestamp_formatting_conn_uuid" \
+      --argjson formattingAttrs          "$formatting_attrs" \
       '{
         name: $name,
         workflow: (
           {
             type: "timestamping",
-            signatureFormatterConnectorUuid: $formatterConnUuid,
-            signatureFormatterConnectorAttributes: $formatterAttrs,
+            signatureFormattingConnectorUuid: $timestampFormattingConnUuid,
+            signatureFormattingConnectorAttributes: $formattingAttrs,
             qualifiedTimestamp: $qualifiedTimestamp,
             defaultPolicyId: $policyOid,
             allowedPolicyIds: [],
@@ -1741,7 +1741,7 @@ setup_tsa_set() {
     poll_certificate  "$cert_uuid" "${CERTIFICATE_DN}-${suffix}"
     trust_certificate_chain "$cert_uuid"
     setup_tsp_profile "$tsp_name" tsp_uuid
-    setup_signing_profile "$sp_name" "$cert_uuid" "$policy_oid" "$tq_uuid" "$FORMATTER_CONN_UUID" sp_uuid
+    setup_signing_profile "$sp_name" "$cert_uuid" "$policy_oid" "$tq_uuid" "$TIMESTAMP_FORMATTING_CONN_UUID" sp_uuid
     link_tsp_signing_profile "$tsp_uuid" "$tsp_name" "$sp_uuid"
     setup_tsp_basic_credential "$tsp_uuid"
   fi
@@ -1769,19 +1769,19 @@ print_summary() {
 Setup complete. Created resources:
 
   Shared infrastructure:
-    connector       common-credential-provider      $CRED_CONN_UUID
-    connector       ejbca-ng-connector              $EJBCA_CONN_UUID
-    connector       software-cryptography-provider  $CRYPTO_CONN_UUID
-    connector       $FORMATTER_CONNECTOR_NAME       $FORMATTER_CONN_UUID
-    connector       $VAULT_CONNECTOR_NAME           $VAULT_CONN_UUID
-    credential      $CREDENTIAL_NAME                $CRED_UUID
-    authority       $AUTHORITY_NAME                 $AUTH_UUID
-    token           $TOKEN_NAME                     $TOKEN_UUID
-    token-profile   $TOKEN_PROFILE_NAME             $TOKEN_PROFILE_UUID
-    vault-instance  $VAULT_INSTANCE_NAME            $VAULT_INSTANCE_UUID
-    vault-profile   $VAULT_PROFILE_NAME             $VAULT_PROFILE_UUID
-    mapped-user     $MAPPED_USER_USERNAME          $MAPPED_USER_UUID
-    role            $MAPPED_USER_ROLE_NAME         $MAPPED_USER_ROLE_UUID  (object-scoped: tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
+    connector       common-credential-provider           $CRED_CONN_UUID
+    connector       ejbca-ng-connector                   $EJBCA_CONN_UUID
+    connector       software-cryptography-provider       $CRYPTO_CONN_UUID
+    connector       $TIMESTAMP_FORMATTING_CONNECTOR_NAME $TIMESTAMP_FORMATTING_CONN_UUID
+    connector       $VAULT_CONNECTOR_NAME                $VAULT_CONN_UUID
+    credential      $CREDENTIAL_NAME                     $CRED_UUID
+    authority       $AUTHORITY_NAME                      $AUTH_UUID
+    token           $TOKEN_NAME                          $TOKEN_UUID
+    token-profile   $TOKEN_PROFILE_NAME                  $TOKEN_PROFILE_UUID
+    vault-instance  $VAULT_INSTANCE_NAME                 $VAULT_INSTANCE_UUID
+    vault-profile   $VAULT_PROFILE_NAME                  $VAULT_PROFILE_UUID
+    mapped-user     $MAPPED_USER_USERNAME                $MAPPED_USER_UUID
+    role            $MAPPED_USER_ROLE_NAME               $MAPPED_USER_ROLE_UUID  (object-scoped: tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
 
   TSA non-qualified set:
     key             $nq_key_name    $KEY_UUID_NQ
