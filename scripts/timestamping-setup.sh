@@ -35,6 +35,8 @@
 set -euo pipefail
 
 # --- Defaults -----------------------------------------------------------------
+# Targets Core running directly from the IDE on the default port.
+# When running Core via docker-compose, override with --ilm-host http://localhost:8280.
 ILM_HOST="http://localhost:8080"
 
 # Authentication mode:
@@ -98,7 +100,7 @@ MAPPED_USER_ROLE_NAME="timestamping"
 TSP_CREDENTIAL_USERNAME="f.jednicka"
 TSP_CREDENTIAL_PASSWORD="tsp-test-changeme"
 
-# Policy OIDs (hardcoded; can be overridden via CLI)
+# Policy OIDs (hardcoded; no CLI override)
 POLICY_ID_NON_QUALIFIED="1.2.3.4.5.6"
 POLICY_ID_QUALIFIED="1.2.3.4.5.7"
 
@@ -559,45 +561,21 @@ setup_connectors() {
   ok "$VAULT_CONNECTOR_NAME  $VAULT_CONN_UUID"
 }
 
-create_cred_connector() {
+# create_connector <name> <port> <version> <log_desc>
+create_connector() {
+  local name="$1" port="$2" version="$3" desc="$4"
   local _resp
-  log "Creating credential-provider connector (port ${PORT_CRED_PROVIDER})..."
+  log "Creating ${desc}..."
   _resp=$(ilm_curl POST /v2/connectors -d \
-    "{\"name\":\"common-credential-provider\",\"url\":\"http://${CONNECTOR_HOST}:${PORT_CRED_PROVIDER}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"v1\"}")
-  require_uuid "$_resp" "common-credential-provider connector"
+    "{\"name\":\"${name}\",\"url\":\"http://${CONNECTOR_HOST}:${port}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"${version}\"}")
+  require_uuid "$_resp" "${name} connector"
 }
 
-create_ejbca_connector() {
-  local _resp
-  log "Creating ejbca-ng connector (port ${PORT_EJBCA})..."
-  _resp=$(ilm_curl POST /v2/connectors -d \
-    "{\"name\":\"ejbca-ng-connector\",\"url\":\"http://${CONNECTOR_HOST}:${PORT_EJBCA}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"v1\"}")
-  require_uuid "$_resp" "ejbca-ng-connector connector"
-}
-
-create_crypto_connector() {
-  local _resp
-  log "Creating software-cryptography-provider connector (port ${PORT_CRYPTO_PROVIDER})..."
-  _resp=$(ilm_curl POST /v2/connectors -d \
-    "{\"name\":\"software-cryptography-provider\",\"url\":\"http://${CONNECTOR_HOST}:${PORT_CRYPTO_PROVIDER}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"v1\"}")
-  require_uuid "$_resp" "software-cryptography-provider connector"
-}
-
-create_formatter_connector() {
-  local _resp
-  log "Creating signature-formatter connector (port ${PORT_FORMATTER})..."
-  _resp=$(ilm_curl POST /v2/connectors -d \
-    "{\"name\":\"${FORMATTER_CONNECTOR_NAME}\",\"url\":\"http://${CONNECTOR_HOST}:${PORT_FORMATTER}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"v2\"}")
-  require_uuid "$_resp" "signature-formatter connector"
-}
-
-create_vault_connector() {
-  local _resp
-  log "Creating credential-provider v2 connector for vault use (port ${PORT_CRED_PROVIDER})..."
-  _resp=$(ilm_curl POST /v2/connectors -d \
-    "{\"name\":\"${VAULT_CONNECTOR_NAME}\",\"url\":\"http://${CONNECTOR_HOST}:${PORT_CRED_PROVIDER}\",\"authType\":\"none\",\"customAttributes\":[],\"version\":\"v2\"}")
-  require_uuid "$_resp" "${VAULT_CONNECTOR_NAME} connector"
-}
+create_cred_connector()      { create_connector "common-credential-provider"    "$PORT_CRED_PROVIDER"   "v1" "credential-provider connector (port ${PORT_CRED_PROVIDER})"; }
+create_ejbca_connector()     { create_connector "ejbca-ng-connector"             "$PORT_EJBCA"           "v1" "ejbca-ng connector (port ${PORT_EJBCA})"; }
+create_crypto_connector()    { create_connector "software-cryptography-provider" "$PORT_CRYPTO_PROVIDER" "v1" "software-cryptography-provider connector (port ${PORT_CRYPTO_PROVIDER})"; }
+create_formatter_connector() { create_connector "$FORMATTER_CONNECTOR_NAME"      "$PORT_FORMATTER"       "v2" "signature-formatter connector (port ${PORT_FORMATTER})"; }
+create_vault_connector()     { create_connector "$VAULT_CONNECTOR_NAME"          "$PORT_CRED_PROVIDER"   "v2" "credential-provider v2 connector for vault use (port ${PORT_CRED_PROVIDER})"; }
 
 # --- Step 2: Credential -------------------------------------------------------
 setup_credential() {
