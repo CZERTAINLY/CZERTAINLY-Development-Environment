@@ -415,11 +415,11 @@ services:
       - email-notification-provider-standalone
       - all
 
-  timestamp-signature-formatter:
-    container_name: timestamp-signature-formatter
-    image: ilm-timestamp-signature-formatter
+  timestamp-formatting-connector:
+    container_name: timestamp-formatting-connector
+    image: ilm-timestamp-formatting-connector
     build:
-      context: ${ILM_SOURCES_BASE_DIR}/timestamp-formatter-connector
+      context: ${ILM_SOURCES_BASE_DIR}/timestamp-formatting-connector
     restart: unless-stopped
     ports:
       - 8270:8080
@@ -429,7 +429,7 @@ services:
       timeout: 5s
       retries: 5
     profiles:
-      - timestamp-signature-formatter-standalone
+      - timestamp-formatting-connector-standalone
       - all
 
   webhook-notification-provider:
