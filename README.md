@@ -29,6 +29,7 @@ Create a `.env` file in the root of the repository and update values. The `.env.
 | DB_USERNAME                 | Username for the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker. |
 | DB_PASSWORD                 | Password for the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker. |
 | DB_NAME                     | Name of the PostgreSQL database. Keep the default value if you are using the PostgreSQL in Docker.      |
+| DB_SSLMODE                  | PostgreSQL SSL mode for JDBC connections (`disable`, `prefer`, `require`, `verify-ca`, `verify-full`). Defaults to `disable`, suitable for local development against the bundled or a host PostgreSQL. |
 | SMTP_HOST                   | Hostname of the SMTP server. Used with the `email-notification-provider` service.                       |
 | SMTP_USERNAME               | Username for the SMTP server. Used with the `email-notification-provider` service.                      |
 | SMTP_PASSWORD               | Password for the SMTP server. Used with the `email-notification-provider` service.                      |

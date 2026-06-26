@@ -105,7 +105,7 @@ services:
     ports:
       - 8102:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
       - BROKER_URL=amqp://rabbitmq:5672
@@ -151,7 +151,7 @@ services:
     ports:
       - 8280:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
       - OPA_BASE_URL=http://opa:8181
@@ -183,7 +183,7 @@ services:
     ports:
       - 8200:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -207,7 +207,7 @@ services:
     ports:
       - 8210:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -259,6 +259,26 @@ services:
       - hashicorp-vault-connector-standalone
       - all
 
+  external-authority-provider:
+    container_name: external-authority-provider
+    image: ilm-external-authority-provider
+    build: ${ILM_SOURCES_BASE_DIR}/external-authority-provider
+    restart: unless-stopped
+    ports:
+      - 8213:8080
+    environment:
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
+      - JDBC_USERNAME=${DB_USERNAME}
+      - JDBC_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      test: wget -O - http://localhost:8080/health/liveness | grep -q '{"status":"UP"}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - external-authority-provider-standalone
+      - all
+
   # ejbca-legacy-connector:
   #   container_name: ejbca-legacy-connector
   #   image: ilm-ejbca-legacy-connector
@@ -266,7 +286,7 @@ services:
   #   ports:
   #       - 8211:8080
   #   environment:
-  #     - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+  #     - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
   #     - JDBC_USERNAME=${DB_USERNAME}
   #     - JDBC_PASSWORD=${DB_PASSWORD}
   #     - SERVER_USERNAME=${GITHUB_USERNAME}
@@ -283,7 +303,7 @@ services:
     ports:
       - 8220:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -303,7 +323,7 @@ services:
     ports:
       - 8230:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -323,7 +343,7 @@ services:
     ports:
       - 8240:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -342,7 +362,7 @@ services:
     ports:
       - 8241:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
@@ -400,7 +420,7 @@ services:
     ports:
       - 8260:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
       - SMTP_HOST=${SMTP_HOST}
@@ -440,7 +460,7 @@ services:
     ports:
       - 8261:8080
     environment:
-      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - JDBC_URL=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}
       - JDBC_USERNAME=${DB_USERNAME}
       - JDBC_PASSWORD=${DB_PASSWORD}
     healthcheck:
