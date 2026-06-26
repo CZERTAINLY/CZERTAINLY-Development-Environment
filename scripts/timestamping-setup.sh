@@ -126,7 +126,7 @@ MTLS_KEY_PEM=""             # mtls mode: temp file holding client key extracted 
 CRED_CONN_UUID=""
 EJBCA_CONN_UUID=""
 CRYPTO_CONN_UUID=""
-TIMESTAMP_FORMATTING_CONN_UUID_CONN_UUID=""
+TIMESTAMP_FORMATTING_CONN_UUID=""
 VAULT_CONN_UUID=""
 CRED_UUID=""
 AUTH_UUID=""
@@ -173,7 +173,8 @@ Connector options (defaults: localhost, ports 8200/8210/8230/8270):
   --port-ejbca PORT                ejbca-ng-connector port             (default: 8210)
   --port-crypto-provider PORT      software-cryptography-provider port (default: 8230)
   --port-timestamp-formatting PORT timestamp-formatting-connector port (default: 8270)
-  --formatting-connector-name NAME timestamp formatting connector name  (default: timestamp-formatting-connector)
+  --timestamp-formatting-connector-name NAME
+                                   timestamp formatting connector name (default: timestamp-formatting-connector)
   --vault-connector-name NAME      credential-provider v2 connector used as vault
                                    (default: common-credential-provider-v2; runs on --port-cred-provider)
 
@@ -549,10 +550,10 @@ setup_connectors() {
     create_crypto_connector
   ok "software-cryptography-provider  $CRYPTO_CONN_UUID"
 
-  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID_CONN_UUID "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="signatureFormatting" and ((.features // []) | index("timestamping")))' \
     create_timestamp_formatting_connector
-  ok "timestamp-formatting-connector  $TIMESTAMP_FORMATTING_CONN_UUID_CONN_UUID"
+  ok "timestamp-formatting-connector  $TIMESTAMP_FORMATTING_CONN_UUID"
 
   discover_or_create_connector VAULT_CONN_UUID "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="secret")' \
@@ -1740,7 +1741,7 @@ setup_tsa_set() {
     poll_certificate  "$cert_uuid" "${CERTIFICATE_DN}-${suffix}"
     trust_certificate_chain "$cert_uuid"
     setup_tsp_profile "$tsp_name" tsp_uuid
-    setup_signing_profile "$sp_name" "$cert_uuid" "$policy_oid" "$tq_uuid" "$TIMESTAMP_FORMATTING_CONN_UUID_CONN_UUID" sp_uuid
+    setup_signing_profile "$sp_name" "$cert_uuid" "$policy_oid" "$tq_uuid" "$TIMESTAMP_FORMATTING_CONN_UUID" sp_uuid
     link_tsp_signing_profile "$tsp_uuid" "$tsp_name" "$sp_uuid"
     setup_tsp_basic_credential "$tsp_uuid"
   fi
@@ -1768,19 +1769,19 @@ print_summary() {
 Setup complete. Created resources:
 
   Shared infrastructure:
-    connector       common-credential-provider      $CRED_CONN_UUID
-    connector       ejbca-ng-connector              $EJBCA_CONN_UUID
-    connector       software-cryptography-provider  $CRYPTO_CONN_UUID
-    connector       $TIMESTAMP_FORMATTING_CONNECTOR_NAME       $TIMESTAMP_FORMATTING_CONN_UUID_CONN_UUID
-    connector       $VAULT_CONNECTOR_NAME           $VAULT_CONN_UUID
-    credential      $CREDENTIAL_NAME                $CRED_UUID
-    authority       $AUTHORITY_NAME                 $AUTH_UUID
-    token           $TOKEN_NAME                     $TOKEN_UUID
-    token-profile   $TOKEN_PROFILE_NAME             $TOKEN_PROFILE_UUID
-    vault-instance  $VAULT_INSTANCE_NAME            $VAULT_INSTANCE_UUID
-    vault-profile   $VAULT_PROFILE_NAME             $VAULT_PROFILE_UUID
-    mapped-user     $MAPPED_USER_USERNAME          $MAPPED_USER_UUID
-    role            $MAPPED_USER_ROLE_NAME         $MAPPED_USER_ROLE_UUID  (object-scoped: tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
+    connector       common-credential-provider           $CRED_CONN_UUID
+    connector       ejbca-ng-connector                   $EJBCA_CONN_UUID
+    connector       software-cryptography-provider       $CRYPTO_CONN_UUID
+    connector       $TIMESTAMP_FORMATTING_CONNECTOR_NAME $TIMESTAMP_FORMATTING_CONN_UUID
+    connector       $VAULT_CONNECTOR_NAME                $VAULT_CONN_UUID
+    credential      $CREDENTIAL_NAME                     $CRED_UUID
+    authority       $AUTHORITY_NAME                      $AUTH_UUID
+    token           $TOKEN_NAME                          $TOKEN_UUID
+    token-profile   $TOKEN_PROFILE_NAME                  $TOKEN_PROFILE_UUID
+    vault-instance  $VAULT_INSTANCE_NAME                 $VAULT_INSTANCE_UUID
+    vault-profile   $VAULT_PROFILE_NAME                  $VAULT_PROFILE_UUID
+    mapped-user     $MAPPED_USER_USERNAME                $MAPPED_USER_UUID
+    role            $MAPPED_USER_ROLE_NAME               $MAPPED_USER_ROLE_UUID  (object-scoped: tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
 
   TSA non-qualified set:
     key             $nq_key_name    $KEY_UUID_NQ
