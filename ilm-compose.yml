@@ -286,10 +286,8 @@ services:
     restart: unless-stopped
     ports:
       - 8214:8080
-    # Stateless Go Authority Provider v3 connector — no database; the OTPKI
-    # backend connection is configured per-authority at runtime via ILM Core.
     healthcheck:
-      test: wget -q -O /dev/null http://localhost:8080/v2/health/liveness || exit 1
+      test: wget -O - http://localhost:8080/v2/health/liveness | grep -q '{"status":"UP"}'
       interval: 10s
       timeout: 5s
       retries: 5
