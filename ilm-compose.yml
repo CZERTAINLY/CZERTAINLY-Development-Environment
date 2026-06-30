@@ -279,6 +279,24 @@ services:
       - external-authority-provider-standalone
       - all
 
+  otpki-connector:
+    container_name: otpki-connector
+    image: ilm-otpki-connector
+    build: ${ILM_SOURCES_BASE_DIR}/otpki-connector
+    restart: unless-stopped
+    ports:
+      - 8214:8080
+    # Stateless Go Authority Provider v3 connector — no database; the OTPKI
+    # backend connection is configured per-authority at runtime via ILM Core.
+    healthcheck:
+      test: wget -q -O /dev/null http://localhost:8080/v2/health/liveness || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - otpki-connector-standalone
+      - all
+
   # ejbca-legacy-connector:
   #   container_name: ejbca-legacy-connector
   #   image: ilm-ejbca-legacy-connector
