@@ -286,8 +286,6 @@ services:
     restart: unless-stopped
     ports:
       - 8214:8080
-    environment:
-      - LOG_LEVEL=DEBUG
     healthcheck:
       test: wget -O - http://localhost:8080/v2/health/liveness | grep -q '{"status":"UP"}'
       interval: 10s
