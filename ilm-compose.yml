@@ -279,6 +279,22 @@ services:
       - external-authority-provider-standalone
       - all
 
+  otpki-connector:
+    container_name: otpki-connector
+    image: ilm-otpki-connector
+    build: ${ILM_SOURCES_BASE_DIR}/otpki-connector
+    restart: unless-stopped
+    ports:
+      - 8214:8080
+    healthcheck:
+      test: wget -O - http://localhost:8080/v2/health/liveness | grep -q '{"status":"UP"}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - otpki-connector-standalone
+      - all
+
   # ejbca-legacy-connector:
   #   container_name: ejbca-legacy-connector
   #   image: ilm-ejbca-legacy-connector
