@@ -1317,10 +1317,10 @@ issue_certificate() {
         csrAttributes: [
           {
             name: "commonName",
-            content: [{data: $cn}],
+            content: [{data: $cn, contentType: "string"}],
             contentType: "string",
             uuid: $cnUuid,
-            version: "v2"
+            version: "v3"
           }
         ],
         signatureAttributes: [
