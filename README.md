@@ -8,14 +8,7 @@ There are couple of microservices that need to be running for the development. D
 The `build:` paths in `ilm-compose.yml` reference source directories under `${ILM_SOURCES_BASE_DIR}` using their lowercase repository names (matching the `OmniTrustILM/<repo>` GitHub convention) — for example `${ILM_SOURCES_BASE_DIR}/auth`, `${ILM_SOURCES_BASE_DIR}/scheduler`, `${ILM_SOURCES_BASE_DIR}/ejbca-ng-connector`.
 
 > [!IMPORTANT]
-> If you previously cloned the sources under their old mixed-case names (e.g. `CZERTAINLY-Auth`, `CZERTAINLY-Scheduler`), rename the directories to the lowercase form before running `docker compose up`, otherwise the build will fail with `path not found`. Example one-liner:
->
-> ```bash
-> for d in "$ILM_SOURCES_BASE_DIR"/CZERTAINLY-*; do
->   new="$(basename "$d" | sed 's/^CZERTAINLY-//' | tr '[:upper:]' '[:lower:]')"
->   mv "$d" "$(dirname "$d")/$new"
-> done
-> ```
+> If your checkout predates the current repository names and still uses older mixed-case directory names, rename each directory to the lowercase form above before running `docker compose up`, otherwise the build fails with `path not found`.
 
 ## Setup the environment variables
 
@@ -92,7 +85,7 @@ The database access is configured using [environment variables](#setup-the-envir
 ### Using the PostgreSQL in Docker
 
 The `postgres-compose.yml` file contains the PostgreSQL database service. The database is used by the core services and the services that require the database.
-By default the database will mount the `./data` directory to store the data. The data will be persisted even if the database is stopped. If the `./data` folder does not exists, it will be created.
+By default the database stores its data under the `./data/postgres` directory. The data will be persisted even if the database is stopped. If the folder does not exist, it will be created.
 
 To start the PostgreSQL database in Docker, you can use the following command:
 
@@ -106,10 +99,10 @@ To stop the PostgreSQL database, you can use the following command:
 docker-compose -f postgres-compose.yml --profile database down
 ```
 
-To remove the data and start the database from scratch, you should remove the `./data` directory.
+To remove the data and start the database from scratch, you should remove the `./data/postgres` directory.
 
 > [!IMPORTANT]  
-> The `./data` directory contains the data of the PostgreSQL database. Removing the directory will remove all data stored in the database. Make sure to back up the data before removing the directory, if necessary.
+> The `./data/postgres` directory contains the data of the PostgreSQL database. Removing the directory will remove all data stored in the database. Make sure to back up the data before removing the directory, if necessary. Note that the parent `./data` directory also holds the broker state under `./data/rabbitmq` — remove only the subtree you mean to reset.
 
 ## Profiles
 
@@ -144,12 +137,12 @@ ILM authenticate the users using the client certificate on the mTLS enabled port
 You can register the certificate for the first administrator using the [`Local API`](https://docs.otilm.com/api/core-local/#tag/Local-operations/operation/addAdmin). For the development purposes, you can use the [`ILM Administrator`](https://github.com/OmniTrustILM/helm-charts/blob/main/dummy-certificates/certs/admin.cert.pem) certificate.
 
 > [!IMPORTANT]
-> The Local API listens only on the container's internal port `8080` and requires no authentication. The externally-mapped port `8280` exposes the regular API, which requires client-cert auth and returns HTTP 401 without one. Use `docker exec` to call the Local API from inside the container:
+> The Local API answers only requests from the `core` container's own localhost and requires no authentication. The externally-mapped port `8280` exposes the regular API, which requires client-cert auth and returns HTTP 401 without one. Use `docker exec` to call the Local API from inside the container — run this from the repository root, since the request body is piped in from `scripts/first-admin.json` (nothing mounts it into the container):
 > ```bash
-> docker exec core curl -X POST \
+> docker exec -i core curl -X POST \
 >   -H 'content-type: application/json' \
->   -d @first-admin.json \
->   http://localhost:8080/api/v1/local/admins
+>   -d @- \
+>   http://localhost:8080/api/v1/local/admins < scripts/first-admin.json
 > ```
 
 To create the administrator, follow [Create Super Administrator](https://docs.otilm.com/docs/certificate-key/installation-guide/create-super-administrator).
@@ -195,17 +188,17 @@ The `scripts/` directory contains helper scripts for one-time setup tasks.
 
 ### `bootstrap-first-admin.sh`
 
-Registers the first administrator account by POSTing `scripts/first-admin.json` to the Local API. This is the script equivalent of the `docker exec` command shown in the [Authentication](#authentication) section above — use whichever is more convenient.
+Registers the first administrator account by POSTing `scripts/first-admin.json` to the Local API. Because the Local API answers only requests from Core's own localhost, the script works against a Core you run in the IDE — for a compose-run Core, use the `docker exec` command shown in the [Authentication](#authentication) section above instead.
 
 ```bash
-# Core running in the IDE (default port 8080)
-./scripts/bootstrap-first-admin.sh --client-cert-pem /path/to/admin.cert.pem
+# Core running in the IDE (the default, http://localhost:8080)
+./scripts/bootstrap-first-admin.sh
 
-# Core running via docker-compose (mapped to host port 8280)
-./scripts/bootstrap-first-admin.sh --ilm-host http://localhost:8280
+# Core listening on a non-default host or port
+./scripts/bootstrap-first-admin.sh --ilm-host http://localhost:8081
 ```
 
-Run `./scripts/bootstrap-first-admin.sh --help` for the full option list.
+`--ilm-host` is the script's only option.
 
 ### `timestamping-setup.sh`
 
@@ -214,7 +207,7 @@ End-to-end provisioning script that creates all ILM objects required for a times
 ```bash
 ./scripts/timestamping-setup.sh \
   --pkcs12-bundle /path/to/ejbca-client.p12 \
-  --certificate-dn "CN=tsa.example.com" \
+  --certificate-dn "tsa.example.com" \
   --client-cert-pem /path/to/admin.cert.pem
 ```
 
@@ -223,3 +216,9 @@ Run `./scripts/timestamping-setup.sh --help` for the full option list (connector
 ## Connectors and technologies
 
 To have a complete setup, you will need to have a technology available for the connectors. For example, if you would like to work with the Authority Provider functions, you should have appropriate connector running that is able to communicate with the target technology.
+
+## Contributing to these docs
+
+`docs/site/development-environment.md` is synced into https://docs.otilm.com. It carries
+`sidebar_position` front matter, and **links may only be same-directory relative links** —
+every other target is an absolute URL.
