@@ -3,8 +3,8 @@
 # first-admin.json to the local admin API. Run once against a fresh instance.
 #
 # By default targets Core running directly from the IDE (default: http://localhost:8080).
-# When running Core via docker-compose, pass the mapped host port instead:
-#   ./bootstrap-first-admin.sh --ilm-host http://localhost:8280
+# The Local API answers only requests from Core's own localhost, so for a Core running
+# via docker compose call it with docker exec instead (see the README).
 
 set -euo pipefail
 

@@ -982,7 +982,7 @@ setup_timestamping_role() {
 
 # --- Step 18: Object-scoped timestamping permissions -------------------------
 # Applied after both TSA sets exist, so every grant targets concrete object UUIDs rather than the
-# whole resource. The OPA method policy (CZERTAINLY-Auth-OPA-Policies/policies/method_policy.rego)
+# whole resource. The OPA method policy (auth-opa-policies/policies/method_policy.rego)
 # honors object-scoped grants for BOTH request shapes on the timestamp path:
 #   - checks that carry the object UUID (tspProfiles/timestamp via SecuredUUID; tokens/detail via the
 #     SecuredParentUUID token instance) are matched by the "ActionAllowedForSpecificObject" rule;
