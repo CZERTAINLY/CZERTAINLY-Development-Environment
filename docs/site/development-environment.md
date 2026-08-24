@@ -313,7 +313,11 @@ Registers the first administrator account by POSTing `scripts/first-admin.json` 
 ./scripts/bootstrap-first-admin.sh --ilm-host http://localhost:8081
 ```
 
-`--ilm-host` is the script's only option.
+The account is registered with the dummy certificate bundled in `scripts/first-admin.json`. To register a different certificate, pass `--client-cert-pem`.
+
+```bash
+./scripts/bootstrap-first-admin.sh --client-cert-pem /path/to/admin.cert.pem
+```
 
 ### timestamping-setup.sh
 
