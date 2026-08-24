@@ -104,6 +104,11 @@ TSP_CREDENTIAL_PASSWORD="tsp-test-changeme"
 POLICY_ID_NON_QUALIFIED="1.2.3.4.5.6"
 POLICY_ID_QUALIFIED="1.2.3.4.5.7"
 
+# Request validation lists written onto the signing profiles.
+# Comma-separated; the literal value "any" provisions an empty list (accept anything).
+ALLOWED_POLICY_IDS=""                                # empty: the set's own policy OID only
+ALLOWED_DIGEST_ALGORITHMS="SHA-256,SHA-384,SHA-512"  # codes from the DigestAlgorithm enum
+
 # Time Quality configuration (used by the qualified signing profile)
 TIME_QUALITY_CONFIG_NAME="time-quality"
 TIME_QUALITY_NTP_SERVERS="ntp"       # comma-separated list, e.g. "pool.ntp.org,time.cloudflare.com"
@@ -221,6 +226,13 @@ Certificate polling:
   --cert-poll-attempts N      Max poll attempts for certificate issuance (default: 20)
   --cert-poll-interval N      Seconds between poll attempts              (default: 1)
 
+Request validation:
+  --allowed-policy-ids LIST   comma-separated TSA policy OIDs (default: own policy OID)
+                              use "any" for an empty, unrestricted list
+  --allowed-digest-algorithms LIST comma-separated DigestAlgorithm (default: SHA-256,SHA-384,SHA-512)
+                              use "any" for an empty, unrestricted list
+  Both apply only to Signing Profiles created by this run; a reused profile keeps its stored lists.
+
 Time Quality configuration (used by the qualified signing profile):
   --time-quality-name NAME                    (default: time-quality)
   --time-quality-ntp-servers SERVERS          Comma-separated NTP server list (default: ntp)
@@ -327,6 +339,14 @@ list_paginated() {
   ilm_curl POST "$1" -d '{"itemsPerPage":1000,"pageNumber":1,"filters":[]}' | jq '.items // []'
 }
 
+# csv_to_json_array <csv> [fallback_csv]
+csv_to_json_array() {
+  local csv="${1:-}" fallback="${2:-}"
+  [[ -z "$csv" ]] && csv="$fallback"
+  [[ "$csv" == "any" || -z "$csv" ]] && { echo '[]'; return 0; }
+  jq -cn --arg csv "$csv" '$csv | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))'
+}
+
 # --- Argument parsing ---------------------------------------------------------
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -368,6 +388,8 @@ parse_args() {
       --signing-profile-name)                   SIGNING_PROFILE_NAME_BASE="$2";              shift 2 ;;
       --cert-poll-attempts)                     CERT_POLL_ATTEMPTS="$2";                     shift 2 ;;
       --cert-poll-interval)                     CERT_POLL_INTERVAL="$2";                     shift 2 ;;
+      --allowed-policy-ids)                     ALLOWED_POLICY_IDS="$2";                     shift 2 ;;
+      --allowed-digest-algorithms)              ALLOWED_DIGEST_ALGORITHMS="$2";              shift 2 ;;
       --time-quality-name)                      TIME_QUALITY_CONFIG_NAME="$2";               shift 2 ;;
       --time-quality-ntp-servers)               TIME_QUALITY_NTP_SERVERS="$2";               shift 2 ;;
       --time-quality-accuracy)                  TIME_QUALITY_ACCURACY="$2";                  shift 2 ;;
@@ -1577,7 +1599,7 @@ setup_tsp_basic_credential() {
 setup_signing_profile() {
   local sp_name="$1" cert_uuid="$2" policy_oid="$3" time_quality_uuid="$4" timestamp_formatting_conn_uuid="$5" out_sp_uuid="$6"
   local _resp sig_attrs sig_scheme_uuid sig_digest_uuid _sp_uuid formatting_attrs
-  local qualified_timestamp _existing _list
+  local qualified_timestamp _existing _list allowed_policies allowed_digests
 
   _list=$(list_paginated /v1/signingProfiles/list)
   _existing=$(find_named_item "$_list" "$sp_name")
@@ -1586,7 +1608,7 @@ setup_signing_profile() {
     if [[ "$(echo "$_existing" | jq -r '.enabled // false')" != "true" ]]; then
       ilm_curl PATCH "/v1/signingProfiles/${_sp_uuid}/enable" >/dev/null
     fi
-    ok "reusing existing Signing Profile '${sp_name}'  $_sp_uuid (keeps its existing certificate; the cert issued this run is left unused)"
+    ok "reusing existing Signing Profile '${sp_name}'  $_sp_uuid (keeps its existing certificate and request-validation allow-lists; the cert issued this run is left unused)"
     printf -v "$out_sp_uuid" '%s' "$_sp_uuid"
     return 0
   fi
@@ -1608,6 +1630,9 @@ setup_signing_profile() {
     "/v1/signingProfiles/signatureFormattingConnectors/${timestamp_formatting_conn_uuid}/formattingAttributes" \
     | jq '[.[] | .version = ("v" + (.version | tostring))]')
 
+  allowed_policies=$(csv_to_json_array "$ALLOWED_POLICY_IDS" "$policy_oid")
+  allowed_digests=$(csv_to_json_array "$ALLOWED_DIGEST_ALGORITHMS")
+
   log "Creating Signing Profile '${sp_name}'..."
   _resp=$(ilm_curl POST /v1/signingProfiles -d \
     "$(jq -n \
@@ -1620,6 +1645,8 @@ setup_signing_profile() {
       --arg  timeQualityUuid             "$time_quality_uuid" \
       --arg  timestampFormattingConnUuid "$timestamp_formatting_conn_uuid" \
       --argjson formattingAttrs          "$formatting_attrs" \
+      --argjson allowedPolicyIds         "$allowed_policies" \
+      --argjson allowedDigestAlgorithms  "$allowed_digests" \
       '{
         name: $name,
         workflow: (
@@ -1629,8 +1656,8 @@ setup_signing_profile() {
             signatureFormattingConnectorAttributes: $formattingAttrs,
             qualifiedTimestamp: $qualifiedTimestamp,
             defaultPolicyId: $policyOid,
-            allowedPolicyIds: [],
-            allowedDigestAlgorithms: []
+            allowedPolicyIds: $allowedPolicyIds,
+            allowedDigestAlgorithms: $allowedDigestAlgorithms
           }
           | if $timeQualityUuid != "" then
               . + {timeQualityConfigurationUuid: $timeQualityUuid}
@@ -1703,6 +1730,7 @@ link_tsp_signing_profile() {
 #
 # Idempotent. If the set's Signing Profile already exists the whole set is treated as already configured and reused
 # WITHOUT issuing a new certificate: EJBCA binds a key to a single end-entity - reusing keys is rejected.
+# Reuse also keeps the profile's stored allowedPolicyIds/allowedDigestAlgorithms. Delete the profile and re-run to change them.
 setup_tsa_set() {
   local suffix="$1" cert_profile="$2" policy_oid="$3" tq_uuid="$4" g="$5"
   local key_name="${KEY_NAME_BASE}-${suffix}"
@@ -1718,7 +1746,7 @@ setup_tsa_set() {
   existing_sp=$(find_named_item "$_list" "$sp_name")
   if [[ -n "$existing_sp" ]]; then
     sp_uuid=$(echo "$existing_sp" | jq -r '.uuid')
-    ok "TSA ${suffix} set already configured (Signing Profile '${sp_name}'  $sp_uuid); reusing, no new certificate issued"
+    ok "TSA ${suffix} set already configured (Signing Profile '${sp_name}'  $sp_uuid); reusing, no new certificate issued and its stored request-validation allow-lists are kept"
     _list=$(ilm_curl GET /v1/keys/pairs)
     key_uuid=$(uuid_of_named "$_list" "$key_name")
     _list=$(ilm_curl GET /v1/raProfiles)
