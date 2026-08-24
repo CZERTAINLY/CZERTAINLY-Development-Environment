@@ -221,13 +221,13 @@ The `rabbitmq` service mounts `./rabbitmq/definitions.json` and `./rabbitmq/rabb
 The import runs only at broker boot, and `definitions.json` is bind-mounted — editing it does not change the service configuration, so `docker compose up` leaves an already-running broker untouched and reports it as up-to-date. After pulling or making an additive topology change, restart the broker so it re-imports:
 
 ```bash
-docker compose -f ilm-compose.yml restart rabbitmq
+docker compose -f ilm-compose.yml --profile core restart rabbitmq
 ```
 
 Confirm the new topology is live:
 
 ```bash
-docker compose -f ilm-compose.yml exec rabbitmq rabbitmqctl list_queues name
+docker compose -f ilm-compose.yml --profile core exec rabbitmq rabbitmqctl list_queues name
 ```
 
 :::
