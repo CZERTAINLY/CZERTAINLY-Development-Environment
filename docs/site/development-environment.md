@@ -216,9 +216,25 @@ The `./data/postgres` directory contains the data of the PostgreSQL database. Re
 
 The `rabbitmq` service mounts `./rabbitmq/definitions.json` and `./rabbitmq/rabbitmq.conf` into the container. On boot the broker imports the topology (the vhost, the `ilm` exchange, the queues and their bindings, and the `guest` admin user) from `definitions.json`. The data directory is bind-mounted at `./data/rabbitmq/data` so broker state persists across restarts.
 
-:::warning[Wipe persisted broker state after a topology change]
+:::note[Restart the broker after adding a queue or binding]
 
-If you upgrade an existing development environment that already has data in `./data/rabbitmq/data` and the broker logs `PRECONDITION_FAILED` errors during the definitions import (typically because previously created queues have different attributes than the new declarations), wipe the persisted state and restart:
+The import runs only at broker boot, and `definitions.json` is bind-mounted — editing it does not change the service configuration, so `docker compose up` leaves an already-running broker untouched and reports it as up-to-date. After pulling or making an additive topology change, restart the broker so it re-imports:
+
+```bash
+docker compose -f ilm-compose.yml --profile core restart rabbitmq
+```
+
+Confirm the new topology is live:
+
+```bash
+docker compose -f ilm-compose.yml --profile core exec rabbitmq rabbitmqctl list_queues name
+```
+
+:::
+
+:::warning[Wipe persisted broker state after a conflicting topology change]
+
+Adding queues and bindings merges cleanly into an existing broker, so a restart is enough. A wipe is needed only for a *conflicting* change: if the broker logs `PRECONDITION_FAILED` errors during the definitions import (typically because previously created queues have different attributes than the new declarations), wipe the persisted state and restart:
 
 ```bash
 docker compose -f ilm-compose.yml down
