@@ -40,8 +40,10 @@ fi
 [[ -f "$CLIENT_CERT_PEM" ]] || { echo "ERROR: certificate not found: $CLIENT_CERT_PEM" >&2; exit 1; }
 command -v jq &>/dev/null || { echo "ERROR: jq is required for --client-cert-pem" >&2; exit 1; }
 
-CERTIFICATE_DATA=$(sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' "$CLIENT_CERT_PEM" \
-  | grep -v "^-----" | tr -d '\n\r')
+# Take the base64 body of the first certificate only.
+CERTIFICATE_DATA=$(awk '/-----BEGIN CERTIFICATE-----/ { body = 1; next }
+                        /-----END CERTIFICATE-----/   { exit }
+                        body' "$CLIENT_CERT_PEM" | tr -d '\n\r')
 [[ -n "$CERTIFICATE_DATA" ]] || { echo "ERROR: no certificate block found in $CLIENT_CERT_PEM" >&2; exit 1; }
 
 jq --arg certificate "$CERTIFICATE_DATA" '.certificateData = $certificate' "${SCRIPT_DIR}/first-admin.json" \
