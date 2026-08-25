@@ -410,10 +410,12 @@ validate() {
 configure_authentication() {
   if [[ "$AUTH_MODE" == "header" ]]; then
     [[ ! -f "$CLIENT_CERT_PEM" ]] && { echo "ERROR: Client cert PEM not found: $CLIENT_CERT_PEM"; exit 1; }
-    # Extract only the base64 body between BEGIN/END CERTIFICATE markers, then URL-encode it.
+    # Extract the base64 body of the first certificate only, then URL-encode it.
     local _cert_b64
-    _cert_b64=$(sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' "$CLIENT_CERT_PEM" \
-      | grep -v "^-----" | tr -d '\n\r')
+    _cert_b64=$(awk '/-----BEGIN CERTIFICATE-----/ { body = 1; next }
+                     /-----END CERTIFICATE-----/   { exit }
+                     body' "$CLIENT_CERT_PEM" | tr -d '\n\r')
+    [[ -n "$_cert_b64" ]] || { echo "ERROR: no certificate block found in: $CLIENT_CERT_PEM"; exit 1; }
     CLIENT_CERT_HEADER_VAL=$(printf '%s' "$_cert_b64" | sed 's/+/%2B/g; s|/|%2F|g; s/=/%3D/g')
     CURL_AUTH_ARGS=(-H "ssl-client-cert: ${CLIENT_CERT_HEADER_VAL}")
     return
