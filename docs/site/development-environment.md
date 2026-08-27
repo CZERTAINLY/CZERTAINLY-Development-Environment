@@ -350,6 +350,8 @@ The connector services it registers must already be running — start them with 
 
 The `--certificate-dn` value is used directly as the certificates' common name prefix — the issued CNs are `<value>-non-qualified` and `<value>-qualified`, so pass a bare name, not a `CN=` string.
 
+Pass `--json-summary <file>` to additionally write the names and UUIDs of every provisioned object as JSON, for scripts and test suites that would otherwise have to scrape the printed summary. The file contains the TSP Basic credential password, so it is created with owner-only (0600) permissions — keep it out of version control.
+
 Run `./scripts/timestamping-setup.sh --help` for the full option list (connector ports, EJBCA profiles, object name bases, polling tunables, and more).
 
 ## Connectors and technologies
