@@ -352,6 +352,8 @@ The `--certificate-dn` value is used directly as the certificates' common name p
 
 Pass `--json-summary <file>` to additionally write the names and UUIDs of every provisioned object as JSON, for scripts and test suites that would otherwise have to scrape the printed summary. The file contains the TSP Basic credential password, so it is created with owner-only (0600) permissions — keep it out of version control.
 
+The flag has one side effect on provisioning. A TSP Basic credential that already exists is normally reused untouched, and the API never returns its stored password. With `--json-summary` the credential is therefore rotated to `--tsp-credential-password` before the summary is written, so the reported password is one that works — which invalidates the password any current consumer of that credential holds. Without the flag no rotation happens.
+
 Run `./scripts/timestamping-setup.sh --help` for the full option list (connector ports, EJBCA profiles, object name bases, polling tunables, and more).
 
 ## Connectors and technologies

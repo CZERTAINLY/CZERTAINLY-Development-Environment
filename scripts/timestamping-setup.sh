@@ -130,11 +130,11 @@ CLIENT_CERT_HEADER_VAL=""
 CURL_AUTH_ARGS=()           # curl auth arguments, built by configure_authentication
 MTLS_CERT_PEM=""            # mtls mode: temp file holding client cert extracted from PKCS12 (OpenSSL curl only)
 MTLS_KEY_PEM=""             # mtls mode: temp file holding client key extracted from PKCS12 (OpenSSL curl only)
-CRED_CONN_UUID=""
-EJBCA_CONN_UUID=""
-CRYPTO_CONN_UUID=""
-TIMESTAMP_FORMATTING_CONN_UUID=""
-VAULT_CONN_UUID=""
+CRED_CONN_UUID=""                  CRED_CONN_NAME=""
+EJBCA_CONN_UUID=""                 EJBCA_CONN_NAME=""
+CRYPTO_CONN_UUID=""                CRYPTO_CONN_NAME=""
+TIMESTAMP_FORMATTING_CONN_UUID=""  TIMESTAMP_FORMATTING_CONN_NAME=""
+VAULT_CONN_UUID=""                 VAULT_CONN_NAME=""
 CRED_UUID=""
 AUTH_UUID=""
 TOKEN_UUID=""
@@ -246,7 +246,8 @@ Request validation:
 
 Output:
   --json-summary FILE         Reports the provisioned objects to FILE as JSON, in addition
-                              to the human-readable summary on stdout.
+                              to the human-readable summary on stdout. Rotates an existing
+                              TSP Basic credential to --tsp-credential-password.
 
 Time Quality configuration (used by the qualified signing profile):
   --time-quality-name NAME                    (default: time-quality)
@@ -551,9 +552,9 @@ load_existing_connectors() {
 }
 
 # find_connector <connectors_json> <select_filter>
-# Prints "<uuid> <statusCode>" for the first matching connector, or nothing.
+# Prints "<uuid>\t<statusCode>\t<name>" for the first matching connector, or nothing.
 find_connector() {
-  echo "$1" | jq -r "first(.[] | select($2)) // empty | \"\(.uuid) \(.status)\""
+  echo "$1" | jq -r "first(.[] | select($2)) // empty | \"\(.uuid)\t\(.status)\t\(.name // \"\")\""
 }
 
 # approve_connector <uuid> -- approves a WAITING_FOR_APPROVAL connector and waits until it reaches CONNECTED.
@@ -570,49 +571,56 @@ approve_connector() {
   die "Connector ${uuid} did not reach 'connected' after approval (last status: '${status}')"
 }
 
-# discover_or_create_connector <out_var> <desc> <connectors_json> <filter> <create_fn>
+# discover_or_create_connector <out_uuid_var> <out_name_var> <created_name> <desc> <connectors_json> <filter> <create_fn>
 discover_or_create_connector() {
-  local out_var="$1" desc="$2" connectors_json="$3" filter="$4" create_fn="$5"
-  local match uuid status
+  local out_var="$1" out_name_var="$2" created_name="$3" desc="$4" connectors_json="$5" filter="$6" create_fn="$7"
+  local match uuid status name
   match=$(find_connector "$connectors_json" "$filter")
   if [[ -n "$match" ]]; then
-    uuid="${match%% *}"; status="${match##* }"
-    log "Found pre-registered ${desc} connector ${uuid} (status=${status})"
+    IFS=$'\t' read -r uuid status name <<<"$match"
+    log "Found pre-registered ${desc} connector '${name}' ${uuid} (status=${status})"
     [[ "$status" == "waitingForApproval" ]] && approve_connector "$uuid"
   else
     log "No pre-registered ${desc} connector found; creating it..."
     uuid=$("$create_fn")
+    name="$created_name"
   fi
   printf -v "$out_var" '%s' "$uuid"
+  printf -v "$out_name_var" '%s' "$name"
 }
 
 setup_connectors() {
   load_existing_connectors
 
-  discover_or_create_connector CRED_CONN_UUID "credential-provider" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector CRED_CONN_UUID CRED_CONN_NAME "common-credential-provider" \
+    "credential-provider" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="credentialProvider" and ((.kinds // []) | index("SoftKeyStore")))' \
     create_cred_connector
-  ok "common-credential-provider  $CRED_CONN_UUID"
+  ok "$CRED_CONN_NAME  $CRED_CONN_UUID"
 
-  discover_or_create_connector EJBCA_CONN_UUID "authority (EJBCA)" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector EJBCA_CONN_UUID EJBCA_CONN_NAME "ejbca-ng-connector" \
+    "authority (EJBCA)" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="authorityProvider" and ((.kinds // []) | index("EJBCA")))' \
     create_ejbca_connector
-  ok "ejbca-ng-connector           $EJBCA_CONN_UUID"
+  ok "$EJBCA_CONN_NAME  $EJBCA_CONN_UUID"
 
-  discover_or_create_connector CRYPTO_CONN_UUID "cryptography-provider" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector CRYPTO_CONN_UUID CRYPTO_CONN_NAME "software-cryptography-provider" \
+    "cryptography-provider" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="cryptographyProvider" and ((.kinds // []) | index("SOFT")))' \
     create_crypto_connector
-  ok "software-cryptography-provider  $CRYPTO_CONN_UUID"
+  ok "$CRYPTO_CONN_NAME  $CRYPTO_CONN_UUID"
 
-  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID TIMESTAMP_FORMATTING_CONN_NAME \
+    "$TIMESTAMP_FORMATTING_CONNECTOR_NAME" "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="signatureFormatting" and ((.features // []) | index("timestamping")))' \
     create_timestamp_formatting_connector
-  ok "timestamp-formatting-connector  $TIMESTAMP_FORMATTING_CONN_UUID"
+  ok "$TIMESTAMP_FORMATTING_CONN_NAME  $TIMESTAMP_FORMATTING_CONN_UUID"
 
-  discover_or_create_connector VAULT_CONN_UUID "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector VAULT_CONN_UUID VAULT_CONN_NAME \
+    "$VAULT_CONNECTOR_NAME" "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="secret")' \
     create_vault_connector
-  ok "$VAULT_CONNECTOR_NAME  $VAULT_CONN_UUID"
+  ok "$VAULT_CONN_NAME  $VAULT_CONN_UUID"
 }
 
 # create_connector <name> <port> <version> <log_desc>
@@ -1609,8 +1617,7 @@ setup_tsp_profile() {
 # --- Step 17: TSP Basic credential -------------------------------------------
 # Usage: setup_tsp_basic_credential <tsp_uuid> <out_cred_uuid_var>
 # Creates a username/password credential on the TSP profile, mapped to MAPPED_USER_UUID.
-# Idempotent: usernames are unique per profile (create returns 409), so an existing one is
-# rotated to the requested password and mapped user.
+# Idempotent: usernames are unique per profile, so an existing one is reused.
 setup_tsp_basic_credential() {
   local tsp_uuid="$1" out_cred_uuid="$2"
   local _creds _existing _resp _cred_uuid
@@ -1620,14 +1627,17 @@ setup_tsp_basic_credential() {
     'first(.[] | select(.username==$u)) // empty')
   if [[ -n "$_existing" ]]; then
     _cred_uuid=$(require_uuid "$_existing" "existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}")
-    # Rotate unconditionally.
-    ilm_curl PUT "/v1/tspProfiles/${tsp_uuid}/basicCredentials/${_cred_uuid}" -d \
-      "$(jq -n \
-        --arg username      "$TSP_CREDENTIAL_USERNAME" \
-        --arg password      "$TSP_CREDENTIAL_PASSWORD" \
-        --arg mappedUserUuid "$MAPPED_USER_UUID" \
-        '{username: $username, password: $password, mappedUserUuid: $mappedUserUuid}')" >/dev/null
-    ok "rotated existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}  $_cred_uuid"
+    if [[ -n "$JSON_SUMMARY_FILE" ]]; then
+      ilm_curl PUT "/v1/tspProfiles/${tsp_uuid}/basicCredentials/${_cred_uuid}" -d \
+        "$(jq -n \
+          --arg username      "$TSP_CREDENTIAL_USERNAME" \
+          --arg password      "$TSP_CREDENTIAL_PASSWORD" \
+          --arg mappedUserUuid "$MAPPED_USER_UUID" \
+          '{username: $username, password: $password, mappedUserUuid: $mappedUserUuid}')" >/dev/null
+      ok "rotated existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}  $_cred_uuid"
+    else
+      ok "reusing existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}  $_cred_uuid"
+    fi
     printf -v "$out_cred_uuid" '%s' "$_cred_uuid"
     return 0
   fi
@@ -1850,11 +1860,11 @@ print_summary() {
 Setup complete. Created resources:
 
   Shared infrastructure:
-    connector       common-credential-provider           $CRED_CONN_UUID
-    connector       ejbca-ng-connector                   $EJBCA_CONN_UUID
-    connector       software-cryptography-provider       $CRYPTO_CONN_UUID
-    connector       $TIMESTAMP_FORMATTING_CONNECTOR_NAME $TIMESTAMP_FORMATTING_CONN_UUID
-    connector       $VAULT_CONNECTOR_NAME                $VAULT_CONN_UUID
+    connector       $CRED_CONN_NAME                      $CRED_CONN_UUID
+    connector       $EJBCA_CONN_NAME                     $EJBCA_CONN_UUID
+    connector       $CRYPTO_CONN_NAME                    $CRYPTO_CONN_UUID
+    connector       $TIMESTAMP_FORMATTING_CONN_NAME      $TIMESTAMP_FORMATTING_CONN_UUID
+    connector       $VAULT_CONN_NAME                     $VAULT_CONN_UUID
     credential      $CREDENTIAL_NAME                     $CRED_UUID
     authority       $AUTHORITY_NAME                      $AUTH_UUID
     token           $TOKEN_NAME                          $TOKEN_UUID
@@ -1897,11 +1907,11 @@ write_json_summary() {
     --arg ilmHost "$ILM_HOST" \
     --arg connectorHost "$CONNECTOR_HOST" \
     --arg certificateDn "$CERTIFICATE_DN" \
-    --arg credConnName "common-credential-provider"         --arg credConnUuid "$CRED_CONN_UUID" \
-    --arg ejbcaConnName "ejbca-ng-connector"                --arg ejbcaConnUuid "$EJBCA_CONN_UUID" \
-    --arg cryptoConnName "software-cryptography-provider"   --arg cryptoConnUuid "$CRYPTO_CONN_UUID" \
-    --arg tfcConnName "$TIMESTAMP_FORMATTING_CONNECTOR_NAME" --arg tfcConnUuid "$TIMESTAMP_FORMATTING_CONN_UUID" \
-    --arg vaultConnName "$VAULT_CONNECTOR_NAME"             --arg vaultConnUuid "$VAULT_CONN_UUID" \
+    --arg credConnName "$CRED_CONN_NAME"                    --arg credConnUuid "$CRED_CONN_UUID" \
+    --arg ejbcaConnName "$EJBCA_CONN_NAME"                  --arg ejbcaConnUuid "$EJBCA_CONN_UUID" \
+    --arg cryptoConnName "$CRYPTO_CONN_NAME"                --arg cryptoConnUuid "$CRYPTO_CONN_UUID" \
+    --arg tfcConnName "$TIMESTAMP_FORMATTING_CONN_NAME"     --arg tfcConnUuid "$TIMESTAMP_FORMATTING_CONN_UUID" \
+    --arg vaultConnName "$VAULT_CONN_NAME"                  --arg vaultConnUuid "$VAULT_CONN_UUID" \
     --arg credentialName "$CREDENTIAL_NAME"                 --arg credentialUuid "$CRED_UUID" \
     --arg authorityName "$AUTHORITY_NAME"                   --arg authorityUuid "$AUTH_UUID" \
     --arg tokenName "$TOKEN_NAME"                           --arg tokenUuid "$TOKEN_UUID" \
