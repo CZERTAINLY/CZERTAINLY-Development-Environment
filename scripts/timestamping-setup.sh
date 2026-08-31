@@ -123,16 +123,18 @@ TIME_QUALITY_LEAP_SECOND_GUARD=true
 CERT_POLL_ATTEMPTS=20  # max poll attempts for certificate issuance
 CERT_POLL_INTERVAL=1   # seconds between poll attempts
 
+JSON_SUMMARY_FILE=""   # --json-summary target; empty disables the JSON summary
+
 # --- Result variables (populated by setup functions) --------------------------
 CLIENT_CERT_HEADER_VAL=""
 CURL_AUTH_ARGS=()           # curl auth arguments, built by configure_authentication
 MTLS_CERT_PEM=""            # mtls mode: temp file holding client cert extracted from PKCS12 (OpenSSL curl only)
 MTLS_KEY_PEM=""             # mtls mode: temp file holding client key extracted from PKCS12 (OpenSSL curl only)
-CRED_CONN_UUID=""
-EJBCA_CONN_UUID=""
-CRYPTO_CONN_UUID=""
-TIMESTAMP_FORMATTING_CONN_UUID=""
-VAULT_CONN_UUID=""
+CRED_CONN_UUID=""                  CRED_CONN_NAME=""
+EJBCA_CONN_UUID=""                 EJBCA_CONN_NAME=""
+CRYPTO_CONN_UUID=""                CRYPTO_CONN_NAME=""
+TIMESTAMP_FORMATTING_CONN_UUID=""  TIMESTAMP_FORMATTING_CONN_NAME=""
+VAULT_CONN_UUID=""                 VAULT_CONN_NAME=""
 CRED_UUID=""
 AUTH_UUID=""
 TOKEN_UUID=""
@@ -144,22 +146,39 @@ MAPPED_USER_ROLE_UUID=""
 
 # Time Quality configuration
 TIME_QUALITY_UUID=""
+# Settings as stored on the server.
+TIME_QUALITY_EFFECTIVE_ACCURACY=""
+TIME_QUALITY_EFFECTIVE_NTP_SERVERS_JSON="[]"
+TIME_QUALITY_EFFECTIVE_NTP_CHECK_INTERVAL=""
+TIME_QUALITY_EFFECTIVE_NTP_CHECK_TIMEOUT=""
+TIME_QUALITY_EFFECTIVE_NTP_SAMPLES_PER_SERVER=""
+TIME_QUALITY_EFFECTIVE_NTP_SERVERS_MIN_REACHABLE=""
+TIME_QUALITY_EFFECTIVE_MAX_CLOCK_DRIFT=""
+TIME_QUALITY_EFFECTIVE_LEAP_SECOND_GUARD=""
 
 # Non-qualified set
 KEY_UUID_NQ=""
 PRIVATE_KEY_ITEM_UUID_NQ=""
 RA_PROFILE_UUID_NQ=""
 ISSUED_CERT_UUID_NQ=""
+ISSUED_CERT_CN_NQ=""
 TSP_PROFILE_UUID_NQ=""
+TSP_CREDENTIAL_UUID_NQ=""
 SIGNING_PROFILE_UUID_NQ=""
+POLICY_OID_NQ=""
+TIME_QUALITY_UUID_NQ=""
 
 # Qualified set
 KEY_UUID_Q=""
 PRIVATE_KEY_ITEM_UUID_Q=""
 RA_PROFILE_UUID_Q=""
 ISSUED_CERT_UUID_Q=""
+ISSUED_CERT_CN_Q=""
 TSP_PROFILE_UUID_Q=""
+TSP_CREDENTIAL_UUID_Q=""
 SIGNING_PROFILE_UUID_Q=""
+POLICY_OID_Q=""
+TIME_QUALITY_UUID_Q=""
 
 # --- Usage --------------------------------------------------------------------
 usage() {
@@ -234,6 +253,12 @@ Request validation:
                               use "any" (any case) for an empty, unrestricted list
   Neither accepts an empty value. Both apply only to Signing Profiles created by this run.
 
+Output:
+  --json-summary FILE         Reports the provisioned objects to FILE as JSON, in addition
+                              to the human-readable summary on stdout. Rotates an existing
+                              TSP Basic credential to --tsp-credential-password. The rotation
+                              reaches the TSP credential cache asynchronously.
+
 Time Quality configuration (used by the qualified signing profile):
   --time-quality-name NAME                    (default: time-quality)
   --time-quality-ntp-servers SERVERS          Comma-separated NTP server list (default: ntp)
@@ -250,9 +275,17 @@ EOF
 
 # --- Helpers ------------------------------------------------------------------
 
-log() { echo "==> $*" >&2; }
-ok()  { echo "    OK: $*" >&2; }
-die() { echo "ERROR: $*" >&2; exit 1; }
+log()  { echo "==> $*" >&2; }
+ok()   { echo "    OK: $*" >&2; }
+warn() { echo "    WARNING: $*" >&2; }
+die()  { echo "ERROR: $*" >&2; exit 1; }
+
+TEMP_FILES=()
+cleanup() { [[ ${#TEMP_FILES[@]} -gt 0 ]] && rm -f "${TEMP_FILES[@]}"; return 0; }
+# Exit from the signal; EXIT does the cleanup.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ilm_curl METHOD PATH [-d BODY]
 # Fails with a clear message on non-2xx HTTP status.
@@ -333,6 +366,7 @@ find_named_item() {
 uuid_of_named() {
   local match; match=$(find_named_item "$1" "$2")
   [[ -n "$match" ]] && echo "$match" | jq -r '.uuid // empty'
+  return 0
 }
 
 # list_paginated <path> -> JSON array of .items for POST .../list endpoints
@@ -400,6 +434,7 @@ parse_args() {
       --cert-poll-interval)                     CERT_POLL_INTERVAL="$2";                     shift 2 ;;
       --allowed-policy-ids)                     ALLOWED_POLICY_IDS="$2";                     shift 2 ;;
       --allowed-digest-algorithms)              ALLOWED_DIGEST_ALGORITHMS="$2";              shift 2 ;;
+      --json-summary)                           JSON_SUMMARY_FILE="$2";                      shift 2 ;;
       --time-quality-name)                      TIME_QUALITY_CONFIG_NAME="$2";               shift 2 ;;
       --time-quality-ntp-servers)               TIME_QUALITY_NTP_SERVERS="$2";               shift 2 ;;
       --time-quality-accuracy)                  TIME_QUALITY_ACCURACY="$2";                  shift 2 ;;
@@ -429,6 +464,8 @@ validate() {
     && { echo "ERROR: --allowed-policy-ids requires a non-blank value (use 'any' for an unrestricted list)"; errors=$((errors+1)); }
   [[ -z "$(trim "$ALLOWED_DIGEST_ALGORITHMS")" ]] \
     && { echo "ERROR: --allowed-digest-algorithms requires a non-blank value (use 'any' for an unrestricted list)"; errors=$((errors+1)); }
+  [[ -z "$(trim "$TSP_CREDENTIAL_PASSWORD")" ]] \
+    && { echo "ERROR: --tsp-credential-password requires a non-blank value"; errors=$((errors+1)); }
   [[ $errors -gt 0 ]] && usage
 
   [[ ! -f "$PKCS12_BUNDLE" ]]   && { echo "ERROR: PKCS12 bundle not found: $PKCS12_BUNDLE"; exit 1; }
@@ -439,7 +476,29 @@ validate() {
 
   [[ -z "$TOKEN_PASSWORD" ]] && TOKEN_PASSWORD="$PKCS12_PASSWORD"
 
+  validate_json_summary_destination
   configure_authentication
+}
+
+validate_json_summary_destination() {
+  [[ -z "$JSON_SUMMARY_FILE" ]] && return 0
+
+  [[ -d "$JSON_SUMMARY_FILE" ]] && die "--json-summary target is a directory: $JSON_SUMMARY_FILE"
+  case "$JSON_SUMMARY_FILE" in
+    */) die "--json-summary target names a directory, not a file: $JSON_SUMMARY_FILE" ;;
+  esac
+  local base; base=$(basename "$JSON_SUMMARY_FILE")
+  [[ "$base" == "." || "$base" == ".." ]] \
+    && die "--json-summary target names a directory, not a file: $JSON_SUMMARY_FILE"
+
+  local dir; dir=$(dirname "$JSON_SUMMARY_FILE")
+  mkdir -p "$dir" || die "Cannot create directory for --json-summary: $dir"
+
+  local probe
+  probe=$(mktemp "${dir}/.json-summary-probe.XXXXXX") \
+    || die "Cannot write the --json-summary destination directory: $dir"
+  rm -f "$probe"
+  return 0
 }
 
 # Populates CURL_AUTH_ARGS according to AUTH_MODE.
@@ -476,8 +535,8 @@ configure_authentication() {
     # OpenSSL-backed curl loads PEM client certs directly: extract cert + key from the bundle.
     MTLS_CERT_PEM=$(mktemp)
     MTLS_KEY_PEM=$(mktemp)
+    TEMP_FILES+=("$MTLS_CERT_PEM" "$MTLS_KEY_PEM")
     chmod 600 "$MTLS_CERT_PEM" "$MTLS_KEY_PEM"
-    trap 'rm -f "$MTLS_CERT_PEM" "$MTLS_KEY_PEM"' EXIT
     extract_p12_pem "$CLIENT_P12_BUNDLE" "$CLIENT_P12_PASSPHRASE" "$MTLS_CERT_PEM" "$MTLS_KEY_PEM"
     CURL_AUTH_ARGS=(--cert "$MTLS_CERT_PEM" --key "$MTLS_KEY_PEM")
   fi
@@ -535,9 +594,9 @@ load_existing_connectors() {
 }
 
 # find_connector <connectors_json> <select_filter>
-# Prints "<uuid> <statusCode>" for the first matching connector, or nothing.
+# Prints "<uuid>\t<statusCode>\t<name>" for the first matching connector, or nothing.
 find_connector() {
-  echo "$1" | jq -r "first(.[] | select($2)) // empty | \"\(.uuid) \(.status)\""
+  echo "$1" | jq -r "first(.[] | select($2)) // empty | \"\(.uuid)\t\(.status)\t\(.name // \"\")\""
 }
 
 # approve_connector <uuid> -- approves a WAITING_FOR_APPROVAL connector and waits until it reaches CONNECTED.
@@ -554,49 +613,56 @@ approve_connector() {
   die "Connector ${uuid} did not reach 'connected' after approval (last status: '${status}')"
 }
 
-# discover_or_create_connector <out_var> <desc> <connectors_json> <filter> <create_fn>
+# discover_or_create_connector <out_uuid_var> <out_name_var> <created_name> <desc> <connectors_json> <filter> <create_fn>
 discover_or_create_connector() {
-  local out_var="$1" desc="$2" connectors_json="$3" filter="$4" create_fn="$5"
-  local match uuid status
+  local out_var="$1" out_name_var="$2" created_name="$3" desc="$4" connectors_json="$5" filter="$6" create_fn="$7"
+  local match uuid status name
   match=$(find_connector "$connectors_json" "$filter")
   if [[ -n "$match" ]]; then
-    uuid="${match%% *}"; status="${match##* }"
-    log "Found pre-registered ${desc} connector ${uuid} (status=${status})"
+    IFS=$'\t' read -r uuid status name <<<"$match"
+    log "Found pre-registered ${desc} connector '${name}' ${uuid} (status=${status})"
     [[ "$status" == "waitingForApproval" ]] && approve_connector "$uuid"
   else
     log "No pre-registered ${desc} connector found; creating it..."
     uuid=$("$create_fn")
+    name="$created_name"
   fi
   printf -v "$out_var" '%s' "$uuid"
+  printf -v "$out_name_var" '%s' "$name"
 }
 
 setup_connectors() {
   load_existing_connectors
 
-  discover_or_create_connector CRED_CONN_UUID "credential-provider" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector CRED_CONN_UUID CRED_CONN_NAME "common-credential-provider" \
+    "credential-provider" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="credentialProvider" and ((.kinds // []) | index("SoftKeyStore")))' \
     create_cred_connector
-  ok "common-credential-provider  $CRED_CONN_UUID"
+  ok "$CRED_CONN_NAME  $CRED_CONN_UUID"
 
-  discover_or_create_connector EJBCA_CONN_UUID "authority (EJBCA)" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector EJBCA_CONN_UUID EJBCA_CONN_NAME "ejbca-ng-connector" \
+    "authority (EJBCA)" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="authorityProvider" and ((.kinds // []) | index("EJBCA")))' \
     create_ejbca_connector
-  ok "ejbca-ng-connector           $EJBCA_CONN_UUID"
+  ok "$EJBCA_CONN_NAME  $EJBCA_CONN_UUID"
 
-  discover_or_create_connector CRYPTO_CONN_UUID "cryptography-provider" "$CONNECTORS_V1_JSON" \
+  discover_or_create_connector CRYPTO_CONN_UUID CRYPTO_CONN_NAME "software-cryptography-provider" \
+    "cryptography-provider" "$CONNECTORS_V1_JSON" \
     '(.functionGroups // []) | any(.functionGroupCode=="cryptographyProvider" and ((.kinds // []) | index("SOFT")))' \
     create_crypto_connector
-  ok "software-cryptography-provider  $CRYPTO_CONN_UUID"
+  ok "$CRYPTO_CONN_NAME  $CRYPTO_CONN_UUID"
 
-  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector TIMESTAMP_FORMATTING_CONN_UUID TIMESTAMP_FORMATTING_CONN_NAME \
+    "$TIMESTAMP_FORMATTING_CONNECTOR_NAME" "timestamp-formatting-connector" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="signatureFormatting" and ((.features // []) | index("timestamping")))' \
     create_timestamp_formatting_connector
-  ok "timestamp-formatting-connector  $TIMESTAMP_FORMATTING_CONN_UUID"
+  ok "$TIMESTAMP_FORMATTING_CONN_NAME  $TIMESTAMP_FORMATTING_CONN_UUID"
 
-  discover_or_create_connector VAULT_CONN_UUID "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
+  discover_or_create_connector VAULT_CONN_UUID VAULT_CONN_NAME \
+    "$VAULT_CONNECTOR_NAME" "vault (credential-provider v2)" "$CONNECTORS_V2_JSON" \
     '(.interfaces // []) | any(.code=="secret")' \
     create_vault_connector
-  ok "$VAULT_CONNECTOR_NAME  $VAULT_CONN_UUID"
+  ok "$VAULT_CONN_NAME  $VAULT_CONN_UUID"
 }
 
 # create_connector <name> <port> <version> <log_desc>
@@ -835,6 +901,18 @@ setup_token_profile() {
 }
 
 # --- Step 6: Time Quality configuration --------------------------------------
+# record_time_quality_settings <configuration_detail_json>
+record_time_quality_settings() {
+  TIME_QUALITY_EFFECTIVE_ACCURACY=$(echo "$1"                  | jq -r 'if .accuracy               == null then empty else .accuracy               end')
+  TIME_QUALITY_EFFECTIVE_MAX_CLOCK_DRIFT=$(echo "$1"           | jq -r 'if .maxClockDrift          == null then empty else .maxClockDrift          end')
+  TIME_QUALITY_EFFECTIVE_NTP_SERVERS_JSON=$(echo "$1"          | jq -c '.ntpServers // []')
+  TIME_QUALITY_EFFECTIVE_NTP_CHECK_INTERVAL=$(echo "$1"        | jq -r 'if .ntpCheckInterval       == null then empty else .ntpCheckInterval       end')
+  TIME_QUALITY_EFFECTIVE_NTP_CHECK_TIMEOUT=$(echo "$1"         | jq -r 'if .ntpCheckTimeout        == null then empty else .ntpCheckTimeout        end')
+  TIME_QUALITY_EFFECTIVE_NTP_SAMPLES_PER_SERVER=$(echo "$1"    | jq -r 'if .ntpSamplesPerServer    == null then empty else .ntpSamplesPerServer    end')
+  TIME_QUALITY_EFFECTIVE_NTP_SERVERS_MIN_REACHABLE=$(echo "$1" | jq -r 'if .ntpServersMinReachable == null then empty else .ntpServersMinReachable end')
+  TIME_QUALITY_EFFECTIVE_LEAP_SECOND_GUARD=$(echo "$1"         | jq -r 'if .leapSecondGuard        == null then empty else .leapSecondGuard        end')
+}
+
 setup_time_quality_config() {
   local _resp ntp_servers_json _existing _list
 
@@ -842,6 +920,9 @@ setup_time_quality_config() {
   _existing=$(find_named_item "$_list" "$TIME_QUALITY_CONFIG_NAME")
   if [[ -n "$_existing" ]]; then
     TIME_QUALITY_UUID=$(echo "$_existing" | jq -r '.uuid')
+    if [[ -n "$JSON_SUMMARY_FILE" ]]; then
+      record_time_quality_settings "$(ilm_curl GET "/v1/timeQualityConfigurations/${TIME_QUALITY_UUID}")"
+    fi
     ok "reusing existing Time Quality configuration '${TIME_QUALITY_CONFIG_NAME}'  $TIME_QUALITY_UUID"
     return 0
   fi
@@ -875,6 +956,7 @@ setup_time_quality_config() {
         customAttributes:       []
       }')")
   TIME_QUALITY_UUID=$(require_uuid "$_resp" "Time Quality configuration '${TIME_QUALITY_CONFIG_NAME}'")
+  record_time_quality_settings "$_resp"
   ok "Time Quality configuration  $TIME_QUALITY_UUID"
 }
 
@@ -1581,29 +1663,47 @@ setup_tsp_profile() {
 }
 
 # --- Step 17: TSP Basic credential -------------------------------------------
-# Usage: setup_tsp_basic_credential <tsp_uuid>
+# Usage: setup_tsp_basic_credential <tsp_uuid> <out_cred_uuid_var>
 # Creates a username/password credential on the TSP profile, mapped to MAPPED_USER_UUID.
-# Idempotent: usernames are unique per profile (create returns 409), so an existing one is reused.
+# Idempotent: usernames are unique per profile, so an existing one is reused.
 setup_tsp_basic_credential() {
-  local tsp_uuid="$1"
-  local _creds _existing
+  local tsp_uuid="$1" out_cred_uuid="$2"
+  local _creds _existing _resp _cred_uuid
 
   _creds=$(ilm_curl GET "/v1/tspProfiles/${tsp_uuid}/basicCredentials")
   _existing=$(echo "$_creds" | jq -c --arg u "$TSP_CREDENTIAL_USERNAME" \
     'first(.[] | select(.username==$u)) // empty')
   if [[ -n "$_existing" ]]; then
-    ok "reusing existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}"
+    _cred_uuid=$(require_uuid "$_existing" "existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}")
+    if [[ -n "$JSON_SUMMARY_FILE" ]]; then
+      local _existing_user_uuid
+      _existing_user_uuid=$(echo "$_existing" | jq -r '.mappedUser.uuid // empty')
+      [[ -n "$_existing_user_uuid" && "$_existing_user_uuid" != "$MAPPED_USER_UUID" ]] && die \
+        "Existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid} is mapped to user ${_existing_user_uuid}, not to '${MAPPED_USER_USERNAME}' (${MAPPED_USER_UUID}); rotating it would re-point a credential owned by someone else - rename it or pass a different --tsp-credential-username and re-run"
+      ilm_curl PUT "/v1/tspProfiles/${tsp_uuid}/basicCredentials/${_cred_uuid}" -d \
+        "$(jq -n \
+          --arg username      "$TSP_CREDENTIAL_USERNAME" \
+          --arg password      "$TSP_CREDENTIAL_PASSWORD" \
+          --arg mappedUserUuid "$MAPPED_USER_UUID" \
+          '{username: $username, password: $password, mappedUserUuid: $mappedUserUuid}')" >/dev/null
+      ok "rotated existing Basic credential '${TSP_CREDENTIAL_USERNAME}' (mapped user $MAPPED_USER_USERNAME) on TSP profile ${tsp_uuid}  $_cred_uuid"
+    else
+      ok "reusing existing Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}  $_cred_uuid"
+    fi
+    printf -v "$out_cred_uuid" '%s' "$_cred_uuid"
     return 0
   fi
 
   log "Creating Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}..."
-  ilm_curl POST "/v1/tspProfiles/${tsp_uuid}/basicCredentials" -d \
+  _resp=$(ilm_curl POST "/v1/tspProfiles/${tsp_uuid}/basicCredentials" -d \
     "$(jq -n \
       --arg username      "$TSP_CREDENTIAL_USERNAME" \
       --arg password      "$TSP_CREDENTIAL_PASSWORD" \
       --arg mappedUserUuid "$MAPPED_USER_UUID" \
-      '{username: $username, password: $password, mappedUserUuid: $mappedUserUuid}')" >/dev/null
-  ok "Basic credential created"
+      '{username: $username, password: $password, mappedUserUuid: $mappedUserUuid}')")
+  _cred_uuid=$(require_uuid "$_resp" "Basic credential '${TSP_CREDENTIAL_USERNAME}' on TSP profile ${tsp_uuid}")
+  ok "Basic credential created  $_cred_uuid"
+  printf -v "$out_cred_uuid" '%s' "$_cred_uuid"
 }
 
 # --- Step 15: Signing Profile -------------------------------------------------
@@ -1744,7 +1844,8 @@ setup_tsa_set() {
   local ra_name="${RA_PROFILE_NAME_BASE}-${suffix}"
   local tsp_name="${TSP_PROFILE_NAME_BASE}-${suffix}"
   local sp_name="${SIGNING_PROFILE_NAME_BASE}-${suffix}"
-  local key_uuid="" priv_uuid="" ra_uuid="" cert_uuid="" tsp_uuid="" sp_uuid=""
+  local key_uuid="" priv_uuid="" ra_uuid="" cert_uuid="" cert_cn="" tsp_uuid="" cred_uuid="" sp_uuid=""
+  local set_policy_oid="" set_tq_uuid=""
   local existing_sp _list sp_details
 
   log "=== Setting up TSA ${suffix} set ==="
@@ -1760,19 +1861,24 @@ setup_tsa_set() {
     ok "TSA ${suffix} set already configured (Signing Profile '${sp_name}'  $sp_uuid); reusing, no new certificate issued and its stored request-validation allow-lists are kept"
     _list=$(ilm_curl GET /v1/keys/pairs)
     key_uuid=$(uuid_of_named "$_list" "$key_name")
+    [[ -z "$key_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no matching key pair '${key_name}'; resolve the inconsistency (recreate or rename the key pair) and re-run"
     _list=$(ilm_curl GET /v1/raProfiles)
     ra_uuid=$(uuid_of_named "$_list" "$ra_name")
+    [[ -z "$ra_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no matching RA profile '${ra_name}'; resolve the inconsistency (recreate or rename the RA profile) and re-run"
     _list=$(list_paginated /v1/tspProfiles/list)
     tsp_uuid=$(uuid_of_named "$_list" "$tsp_name")
-    # A reused set with no matching TSP profile is a half-configured state: grant_timestamping_permissions
-    # would otherwise emit a tspProfiles grant keyed to an empty UUID, so the timestamp right is silently
-    # never granted and only surfaces as an OPA rejection at request time. Fail fast instead.
+    # A reused set with no matching TSP profile is a half-configured state.
     [[ -z "$tsp_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no matching TSP profile '${tsp_name}'; resolve the inconsistency (recreate or rename the TSP profile) and re-run"
     # The detail DTO nests the cert as signingScheme.certificate (CertificateSimpleDto), not certificateUuid.
     sp_details=$(ilm_curl GET "/v1/signingProfiles/${sp_uuid}")
     cert_uuid=$(echo "$sp_details" | jq -r '.signingScheme.certificate.uuid // empty')
     [[ -z "$cert_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no signing certificate; resolve the inconsistency and re-run"
-    setup_tsp_basic_credential "$tsp_uuid"
+    cert_cn=$(echo "$sp_details" | jq -r '.signingScheme.certificate.commonName // empty')
+    [[ -z "$cert_cn" ]] && warn "Reused Signing Profile '${sp_name}' ($sp_uuid) reports no certificate common name; the summary reports it as unknown"
+    # A reused profile keeps what an earlier run stored.
+    set_policy_oid=$(echo "$sp_details" | jq -r '.workflow.defaultPolicyId // empty')
+    set_tq_uuid=$(echo "$sp_details" | jq -r '.workflow.timeQualityConfiguration.uuid // empty')
+    setup_tsp_basic_credential "$tsp_uuid" cred_uuid
   else
     setup_key_pair    "$key_name" key_uuid priv_uuid
     setup_ra_profile  "$ra_name" "$cert_profile" ra_uuid
@@ -1782,14 +1888,21 @@ setup_tsa_set() {
     setup_tsp_profile "$tsp_name" tsp_uuid
     setup_signing_profile "$sp_name" "$cert_uuid" "$policy_oid" "$tq_uuid" "$TIMESTAMP_FORMATTING_CONN_UUID" sp_uuid
     link_tsp_signing_profile "$tsp_uuid" "$tsp_name" "$sp_uuid"
-    setup_tsp_basic_credential "$tsp_uuid"
+    setup_tsp_basic_credential "$tsp_uuid" cred_uuid
+    cert_cn="${CERTIFICATE_DN}-${suffix}"
+    set_policy_oid="$policy_oid"
+    set_tq_uuid="$tq_uuid"
   fi
 
   printf -v "KEY_UUID_${g}"             '%s' "$key_uuid"
   printf -v "RA_PROFILE_UUID_${g}"      '%s' "$ra_uuid"
   printf -v "ISSUED_CERT_UUID_${g}"     '%s' "$cert_uuid"
+  printf -v "ISSUED_CERT_CN_${g}"       '%s' "$cert_cn"
   printf -v "TSP_PROFILE_UUID_${g}"     '%s' "$tsp_uuid"
+  printf -v "TSP_CREDENTIAL_UUID_${g}"  '%s' "$cred_uuid"
   printf -v "SIGNING_PROFILE_UUID_${g}" '%s' "$sp_uuid"
+  printf -v "POLICY_OID_${g}"           '%s' "$set_policy_oid"
+  printf -v "TIME_QUALITY_UUID_${g}"    '%s' "$set_tq_uuid"
 }
 
 # --- Summary ------------------------------------------------------------------
@@ -1808,11 +1921,11 @@ print_summary() {
 Setup complete. Created resources:
 
   Shared infrastructure:
-    connector       common-credential-provider           $CRED_CONN_UUID
-    connector       ejbca-ng-connector                   $EJBCA_CONN_UUID
-    connector       software-cryptography-provider       $CRYPTO_CONN_UUID
-    connector       $TIMESTAMP_FORMATTING_CONNECTOR_NAME $TIMESTAMP_FORMATTING_CONN_UUID
-    connector       $VAULT_CONNECTOR_NAME                $VAULT_CONN_UUID
+    connector       $CRED_CONN_NAME                      $CRED_CONN_UUID
+    connector       $EJBCA_CONN_NAME                     $EJBCA_CONN_UUID
+    connector       $CRYPTO_CONN_NAME                    $CRYPTO_CONN_UUID
+    connector       $TIMESTAMP_FORMATTING_CONN_NAME      $TIMESTAMP_FORMATTING_CONN_UUID
+    connector       $VAULT_CONN_NAME                     $VAULT_CONN_UUID
     credential      $CREDENTIAL_NAME                     $CRED_UUID
     authority       $AUTHORITY_NAME                      $AUTH_UUID
     token           $TOKEN_NAME                          $TOKEN_UUID
@@ -1825,20 +1938,136 @@ Setup complete. Created resources:
   TSA non-qualified set:
     key             $nq_key_name    $KEY_UUID_NQ
     ra-profile      $nq_ra_name     $RA_PROFILE_UUID_NQ
-    certificate     CN=${CERTIFICATE_DN}-non-qualified   $ISSUED_CERT_UUID_NQ
+    certificate     CN=${ISSUED_CERT_CN_NQ}   $ISSUED_CERT_UUID_NQ
     tsp-profile     $nq_tsp_name    $TSP_PROFILE_UUID_NQ
     signing-profile $nq_sp_name     $SIGNING_PROFILE_UUID_NQ
-    basic-cred      $TSP_CREDENTIAL_USERNAME (mapped user $MAPPED_USER_USERNAME)
+    basic-cred      $TSP_CREDENTIAL_USERNAME (mapped user $MAPPED_USER_USERNAME)   $TSP_CREDENTIAL_UUID_NQ
 
   TSA qualified set:
     time-quality    $TIME_QUALITY_CONFIG_NAME       $TIME_QUALITY_UUID
     key             $q_key_name     $KEY_UUID_Q
     ra-profile      $q_ra_name      $RA_PROFILE_UUID_Q
-    certificate     CN=${CERTIFICATE_DN}-qualified   $ISSUED_CERT_UUID_Q
+    certificate     CN=${ISSUED_CERT_CN_Q}   $ISSUED_CERT_UUID_Q
     tsp-profile     $q_tsp_name     $TSP_PROFILE_UUID_Q
     signing-profile $q_sp_name      $SIGNING_PROFILE_UUID_Q
-    basic-cred      $TSP_CREDENTIAL_USERNAME (mapped user $MAPPED_USER_USERNAME)
+    basic-cred      $TSP_CREDENTIAL_USERNAME (mapped user $MAPPED_USER_USERNAME)   $TSP_CREDENTIAL_UUID_Q
 EOF
+}
+
+write_json_summary() {
+  [[ -z "$JSON_SUMMARY_FILE" ]] && return 0
+  [[ -d "$JSON_SUMMARY_FILE" ]] && die "--json-summary target is a directory: $JSON_SUMMARY_FILE"
+
+  local dir; dir=$(dirname "$JSON_SUMMARY_FILE")
+  mkdir -p "$dir" || die "Cannot create directory for --json-summary: $dir"
+
+  # The summary carries the TSP Basic credential password.
+  local tmp; tmp=$(mktemp "${dir}/.json-summary.XXXXXX") || die "Cannot create a temporary file in $dir"
+  TEMP_FILES+=("$tmp")
+  chmod 600 "$tmp" || die "Cannot restrict permissions on $tmp"
+  local mode
+  mode=$(stat -c '%a' "$tmp" 2>/dev/null || stat -f '%Lp' "$tmp" 2>/dev/null || echo "")
+  [[ "$mode" == "600" ]] \
+    || warn "$JSON_SUMMARY_FILE will hold the TSP Basic credential password at mode ${mode:-unknown}, not 0600; this filesystem does not enforce POSIX permissions - protect the file yourself"
+
+  jq -n \
+    --arg ilmHost "$ILM_HOST" \
+    --arg connectorHost "$CONNECTOR_HOST" \
+    --arg certificateDn "$CERTIFICATE_DN" \
+    --arg credConnName "$CRED_CONN_NAME"                    --arg credConnUuid "$CRED_CONN_UUID" \
+    --arg ejbcaConnName "$EJBCA_CONN_NAME"                  --arg ejbcaConnUuid "$EJBCA_CONN_UUID" \
+    --arg cryptoConnName "$CRYPTO_CONN_NAME"                --arg cryptoConnUuid "$CRYPTO_CONN_UUID" \
+    --arg tfcConnName "$TIMESTAMP_FORMATTING_CONN_NAME"     --arg tfcConnUuid "$TIMESTAMP_FORMATTING_CONN_UUID" \
+    --arg vaultConnName "$VAULT_CONN_NAME"                  --arg vaultConnUuid "$VAULT_CONN_UUID" \
+    --arg credentialName "$CREDENTIAL_NAME"                 --arg credentialUuid "$CRED_UUID" \
+    --arg authorityName "$AUTHORITY_NAME"                   --arg authorityUuid "$AUTH_UUID" \
+    --arg tokenName "$TOKEN_NAME"                           --arg tokenUuid "$TOKEN_UUID" \
+    --arg tokenProfileName "$TOKEN_PROFILE_NAME"            --arg tokenProfileUuid "$TOKEN_PROFILE_UUID" \
+    --arg vaultInstanceName "$VAULT_INSTANCE_NAME"          --arg vaultInstanceUuid "$VAULT_INSTANCE_UUID" \
+    --arg vaultProfileName "$VAULT_PROFILE_NAME"            --arg vaultProfileUuid "$VAULT_PROFILE_UUID" \
+    --arg mappedUserName "$MAPPED_USER_USERNAME"            --arg mappedUserUuid "$MAPPED_USER_UUID" \
+    --arg roleName "$MAPPED_USER_ROLE_NAME"                 --arg roleUuid "$MAPPED_USER_ROLE_UUID" \
+    --arg basicUser "$TSP_CREDENTIAL_USERNAME"              --arg basicPassword "$TSP_CREDENTIAL_PASSWORD" \
+    --arg tqName "$TIME_QUALITY_CONFIG_NAME"                --arg tqUuid "$TIME_QUALITY_UUID" \
+    --arg tqAccuracy "$TIME_QUALITY_EFFECTIVE_ACCURACY" \
+    --argjson tqNtpServers "$TIME_QUALITY_EFFECTIVE_NTP_SERVERS_JSON" \
+    --arg tqMaxDrift "$TIME_QUALITY_EFFECTIVE_MAX_CLOCK_DRIFT" \
+    --arg tqCheckInterval "$TIME_QUALITY_EFFECTIVE_NTP_CHECK_INTERVAL" \
+    --arg tqCheckTimeout "$TIME_QUALITY_EFFECTIVE_NTP_CHECK_TIMEOUT" \
+    --arg tqSamplesPerServer "$TIME_QUALITY_EFFECTIVE_NTP_SAMPLES_PER_SERVER" \
+    --arg tqMinReachable "$TIME_QUALITY_EFFECTIVE_NTP_SERVERS_MIN_REACHABLE" \
+    --arg tqLeapSecondGuard "$TIME_QUALITY_EFFECTIVE_LEAP_SECOND_GUARD" \
+    --arg nqPolicyOid "$POLICY_OID_NQ"                      --arg qPolicyOid "$POLICY_OID_Q" \
+    --arg nqTqUuid "$TIME_QUALITY_UUID_NQ"                  --arg qTqUuid "$TIME_QUALITY_UUID_Q" \
+    --arg nqKeyName "${KEY_NAME_BASE}-non-qualified"        --arg nqKeyUuid "$KEY_UUID_NQ" \
+    --arg nqRaName "${RA_PROFILE_NAME_BASE}-non-qualified"  --arg nqRaUuid "$RA_PROFILE_UUID_NQ" \
+    --arg nqCertCn "$ISSUED_CERT_CN_NQ"                     --arg nqCertUuid "$ISSUED_CERT_UUID_NQ" \
+    --arg nqTspName "${TSP_PROFILE_NAME_BASE}-non-qualified" --arg nqTspUuid "$TSP_PROFILE_UUID_NQ" \
+    --arg nqCredUuid "$TSP_CREDENTIAL_UUID_NQ" \
+    --arg nqSpName "${SIGNING_PROFILE_NAME_BASE}-non-qualified" --arg nqSpUuid "$SIGNING_PROFILE_UUID_NQ" \
+    --arg qKeyName "${KEY_NAME_BASE}-qualified"             --arg qKeyUuid "$KEY_UUID_Q" \
+    --arg qRaName "${RA_PROFILE_NAME_BASE}-qualified"       --arg qRaUuid "$RA_PROFILE_UUID_Q" \
+    --arg qCertCn "$ISSUED_CERT_CN_Q"                       --arg qCertUuid "$ISSUED_CERT_UUID_Q" \
+    --arg qTspName "${TSP_PROFILE_NAME_BASE}-qualified"     --arg qTspUuid "$TSP_PROFILE_UUID_Q" \
+    --arg qCredUuid "$TSP_CREDENTIAL_UUID_Q" \
+    --arg qSpName "${SIGNING_PROFILE_NAME_BASE}-qualified"  --arg qSpUuid "$SIGNING_PROFILE_UUID_Q" \
+    '{
+      ilmHost: $ilmHost,
+      connectorHost: $connectorHost,
+      certificateDnPrefix: $certificateDn,
+      connectors: {
+        credentialProvider:  { name: $credConnName,   uuid: $credConnUuid },
+        ejbca:               { name: $ejbcaConnName,  uuid: $ejbcaConnUuid },
+        cryptographyProvider:{ name: $cryptoConnName, uuid: $cryptoConnUuid },
+        timestampFormatting: { name: $tfcConnName,    uuid: $tfcConnUuid },
+        vault:               { name: $vaultConnName,  uuid: $vaultConnUuid }
+      },
+      credential:    { name: $credentialName,   uuid: $credentialUuid },
+      authority:     { name: $authorityName,    uuid: $authorityUuid },
+      token:         { name: $tokenName,        uuid: $tokenUuid },
+      tokenProfile:  { name: $tokenProfileName, uuid: $tokenProfileUuid },
+      vaultInstance: { name: $vaultInstanceName, uuid: $vaultInstanceUuid },
+      vaultProfile:  { name: $vaultProfileName, uuid: $vaultProfileUuid },
+      mappedUser:    { username: $mappedUserName, uuid: $mappedUserUuid },
+      role:          { name: $roleName, uuid: $roleUuid },
+      tspCredential: { username: $basicUser, password: $basicPassword },
+      timeQuality: {
+        name:                   $tqName, uuid: $tqUuid, accuracy: $tqAccuracy,
+        ntpServers:             $tqNtpServers, maxClockDrift: $tqMaxDrift,
+        ntpCheckInterval:       $tqCheckInterval, ntpCheckTimeout: $tqCheckTimeout,
+        ntpSamplesPerServer:    ($tqSamplesPerServer | tonumber? // null),
+        ntpServersMinReachable: ($tqMinReachable     | tonumber? // null),
+        leapSecondGuard:        (if $tqLeapSecondGuard == "" then null else $tqLeapSecondGuard == "true" end)
+      },
+      sets: {
+        nonQualified: {
+          qualified: false,
+          policyOid:       (if $nqPolicyOid == "" then null else $nqPolicyOid end),
+          timeQualityUuid: (if $nqTqUuid == "" then null else $nqTqUuid end),
+          key:             { name: $nqKeyName,  uuid: $nqKeyUuid },
+          raProfile:       { name: $nqRaName,   uuid: $nqRaUuid },
+          certificate:     { commonName: (if $nqCertCn == "" then null else $nqCertCn end), uuid: $nqCertUuid },
+          tspProfile:      { name: $nqTspName,  uuid: $nqTspUuid },
+          basicCredential: { username: $basicUser, uuid: $nqCredUuid },
+          signingProfile:  { name: $nqSpName,   uuid: $nqSpUuid }
+        },
+        qualified: {
+          qualified: true,
+          policyOid:       (if $qPolicyOid == "" then null else $qPolicyOid end),
+          timeQualityUuid: (if $qTqUuid == "" then null else $qTqUuid end),
+          key:             { name: $qKeyName,  uuid: $qKeyUuid },
+          raProfile:       { name: $qRaName,   uuid: $qRaUuid },
+          certificate:     { commonName: (if $qCertCn == "" then null else $qCertCn end), uuid: $qCertUuid },
+          tspProfile:      { name: $qTspName,  uuid: $qTspUuid },
+          basicCredential: { username: $basicUser, uuid: $qCredUuid },
+          signingProfile:  { name: $qSpName,   uuid: $qSpUuid }
+        }
+      }
+    }' > "$tmp" || die "Failed to write JSON summary to $JSON_SUMMARY_FILE"
+
+  mv "$tmp" "$JSON_SUMMARY_FILE" || die "Failed to move the JSON summary into place at $JSON_SUMMARY_FILE"
+
+  ok "JSON summary written to $JSON_SUMMARY_FILE"
 }
 
 # --- Main ---------------------------------------------------------------------
@@ -1862,6 +2091,7 @@ main() {
   grant_timestamping_permissions
 
   print_summary
+  write_json_summary
 }
 
 main "$@"

@@ -350,6 +350,12 @@ The connector services it registers must already be running — start them with 
 
 The `--certificate-dn` value is used directly as the certificates' common name prefix — the issued CNs are `<value>-non-qualified` and `<value>-qualified`, so pass a bare name, not a `CN=` string.
 
+Pass `--json-summary <file>` to additionally write the names and UUIDs of every provisioned object as JSON, for scripts and test suites that would otherwise have to scrape the printed summary. The file contains the TSP Basic credential password, so on POSIX filesystems it is created with owner-only (0600) permissions — keep it out of version control. Some Windows setups do not enforce POSIX modes — Git Bash, and WSL writing to a Windows drive under `/mnt` mounted without the `metadata` option. There `chmod` reports success while the file stays group- and world-readable. (WSL's own Linux filesystem does enforce them normally.) The script therefore checks the mode that actually stuck and warns when it is not 0600 — protect the file yourself when you see that warning.
+
+The flag has one side effect on provisioning. A TSP Basic credential that already exists is normally reused untouched, and the API never returns its stored password. With `--json-summary` the credential is therefore rotated to `--tsp-credential-password` before the summary is written, so the reported password is one that works — which invalidates the password any current consumer of that credential holds. Without the flag no rotation happens.
+
+The rotation is not effective the instant the script exits. The platform stores the secret in Vault asynchronously and evicts its credential cache from the resulting event, so a TSP request fired immediately after reading the summary can still be authenticated against the previous password and rejected with a 401. The width of that window is not specified — retry on a 401 rather than treating the first one as a failure.
+
 Run `./scripts/timestamping-setup.sh --help` for the full option list (connector ports, EJBCA profiles, object name bases, polling tunables, and more).
 
 ## Connectors and technologies
